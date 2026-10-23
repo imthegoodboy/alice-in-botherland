@@ -1,0 +1,232 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v1.6.16",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "Chandelier_02"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "Chandelier_02",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "Chandelier_02_bulb",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.800000011920929,
+          0.800000011920929,
+          0.800000011920929,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.27272725105285645
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cylinder010.002",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        },
+        {
+          "attributes": {
+            "POSITION": 4,
+            "NORMAL": 5,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 1
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "Chandelier_02_nor_gl",
+      "uri": "textures/Chandelier_02_nor_gl_2k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "Chandelier_02_diff",
+      "uri": "textures/Chandelier_02_diff_2k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "Chandelier_02_metallic-Chandelier_02_roughness",
+      "uri": "textures/Chandelier_02_arm_2k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 14610,
+      "max": [
+        0.3385334312915802,
+        0.9077612161636353,
+        0.313377320766449
+      ],
+      "min": [
+        -0.3404228985309601,
+        0.059688448905944824,
+        -0.30570584535598755
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 14610,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 14610,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 62130,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 480,
+      "max": [
+        0.2776203155517578,
+        0.3521993160247803,
+        0.25329941511154175
+      ],
+      "min": [
+        -0.27993717789649963,
+        0.28631478548049927,
+        -0.24526801705360413
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 480,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 480,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 2412,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 175320,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 175320,
+      "byteOffset": 175320
+    },
+    {
+      "buffer": 0,
+      "byteLength": 116880,
+      "byteOffset": 350640
+    },
+    {
+      "buffer": 0,
+      "byteLength": 124260,
+      "byteOffset": 467520
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5760,
+      "byteOffset": 591780
+    },
+    {
+      "buffer": 0,
+      "byteLength": 5760,
+      "byteOffset": 597540
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3840,
+      "byteOffset": 603300
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4824,
+      "byteOffset": 607140
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 611964,
+      "uri": "Chandelier_02.bin"
+    }
+  ]
+}

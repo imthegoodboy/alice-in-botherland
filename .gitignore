@@ -46,9 +46,13 @@ Content/__ExternalActors__/NewMap/
 Content/__ExternalActors__/Survival_01/
 
 
-.env# Levels duplicated from paid packs (contain licensed landscape/layout)
+# Levels duplicated from paid packs (contain licensed landscape/layout)
 Content/AliceInBotherland/Maps/L_Desert_Main.umap
 
 # Secrets
 .env
 .env.*
+
+# Island map derived from the licensed desert pack
+Content/AliceInBotherland/Maps/L_Island.umap
+Content/AliceInBotherland/Maps/L_Island_BuiltData.uasset

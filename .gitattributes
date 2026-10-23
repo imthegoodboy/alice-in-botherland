@@ -14,3 +14,14 @@
 *.mp3    filter=lfs diff=lfs merge=lfs -text
 *.ogg    filter=lfs diff=lfs merge=lfs -text
 *.mp4    filter=lfs diff=lfs merge=lfs -text
+*.glb    filter=lfs diff=lfs merge=lfs -text
+*.exr    filter=lfs diff=lfs merge=lfs -text
+*.hdr    filter=lfs diff=lfs merge=lfs -text
+SourceAssets/**/*.bin filter=lfs diff=lfs merge=lfs -text
+# Audio
+*.wav    filter=lfs diff=lfs merge=lfs -text
+*.mp3    filter=lfs diff=lfs merge=lfs -text
+*.ogg    filter=lfs diff=lfs merge=lfs -text
+# Fonts
+*.ttf    filter=lfs diff=lfs merge=lfs -text
+*.otf    filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,43 @@
+ALICE IN BOTHERLAND - THE LAST ISLAND
+
+A game by imthegoodboy
+Built with Unreal Engine 5.8 and an agentic workflow with Claude Code (Anthropic).
+
+
+CHARACTERS & ENVIRONMENT
+Survival Character - Arberry (Fab marketplace)
+Modular Post Apocalyptic Desert - JustB Studios (Fab marketplace)
+Offroad vehicle - Epic Games Vehicle Template
+Ships, coastline, pier, hotel furniture, statues and textures - Poly Haven (polyhaven.com), CC0
+Guardian statue, throne, altar, switch, podiums, table, suit symbols - made for this game
+
+
+MUSIC
+All music by Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License - http://creativecommons.org/licenses/by/4.0/
+
+"Lightless Dawn" (Main menu)
+"Stay the Course" (Lobby)
+"Tempting Secrets" (Arrival)
+"Mirage" (The island)
+"Controlled Chaos" (The Number Game)
+"Crypto" (The Hidden Symbol)
+"Movement Proposition" (Race to the Guardian)
+"Hero Down" (The Guardian's Choice)
+"Long Road Ahead" (Ending - The Crown)
+"The Parting" (Ending - The Sacrifice)
+Some tracks were shortened with a fade-out and loudness-normalized.
+
+
+VOICES & SOUND
+Narrator and Guardian voices generated with ElevenLabs (elevenlabs.io) - voices "George" and "Brian".
+Ambient and cinematic sound effects generated with ElevenLabs; interface sounds synthesized for this game.
+
+
+FONTS
+Bebas Neue, Barlow, Barlow Condensed, Cinzel, Noto Sans Symbols 2 - SIL Open Font License 1.1
+Community crests from Google Material Icons - Apache License 2.0
+
+
+Inspired by the tension of "Alice in Borderland".
+Thank you for playing.

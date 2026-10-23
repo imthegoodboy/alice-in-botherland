@@ -1,0 +1,34 @@
+{
+  "voices": {
+    "narrator": {"voice_id": "JBFqnCBsd6RMkjVDRZzb", "name": "George", "model": "eleven_multilingual_v2", "settings": {"stability": 0.45, "similarity_boost": 0.8, "style": 0.35, "use_speaker_boost": true}},
+    "guardian": {"voice_id": "nPczCjzI2devNBz1zQrb", "name": "Brian", "model": "eleven_multilingual_v2", "settings": {"stability": 0.6, "similarity_boost": 0.85, "style": 0.25, "use_speaker_boost": true}, "post": "pitch_down_reverb"}
+  },
+  "lines": [
+    {"id": "VO_Prologue_01", "voice": "narrator", "text": "They called it the Long Burn. The year the oceans turned, the sea began to eat everything it touched."},
+    {"id": "VO_Prologue_02", "voice": "narrator", "text": "Reefs dissolved. Harbors rusted overnight. The water that once fed the world became a slow green acid, and the coasts fell silent."},
+    {"id": "VO_Prologue_03", "voice": "narrator", "text": "Those who survived took to the waves. Floating towns of scrap and sail, drifting from one dying shore to the next. We called ourselves the Nomads."},
+    {"id": "VO_Prologue_04", "voice": "narrator", "text": "For thirty years we searched. Then, beyond the Bleached Reach, a beacon answered. An island the acid had never touched. Fresh water. Soil. Shelter. A future."},
+    {"id": "VO_Prologue_05", "voice": "narrator", "text": "But the island has a keeper. The Guardian. And it speaks only one law: the island will belong to one community. Only one."},
+    {"id": "VO_Prologue_06", "voice": "narrator", "text": "Five fleets answered the beacon. Each sent a single champion. Three trials. Five champions. One island. And at the end of it all, a choice."},
+    {"id": "VO_Arrival", "voice": "narrator", "text": "Five communities have found their last hope. Only one community can claim this island. Your survival depends on your choices."},
+    {"id": "VO_Explore", "voice": "guardian", "text": "Champions. Walk my island. See what you would fight for. The first trial begins soon."},
+    {"id": "VO_Stage1_Brief", "voice": "guardian", "text": "The first trial. The Number Game. Choose a number from zero to one hundred. Your target is eighty percent of the average. Closest survives. Farthest is lost."},
+    {"id": "VO_Stage1_Round", "voice": "guardian", "text": "Choose."},
+    {"id": "VO_Stage1_SuddenDeath", "voice": "guardian", "text": "A tie at the edge. Sudden death."},
+    {"id": "VO_Stage1_Elim", "voice": "guardian", "text": "A champion has fallen. Four remain."},
+    {"id": "VO_Stage2_Brief", "voice": "guardian", "text": "The second trial. The Hidden Symbol. You carry a mark you cannot see. Your rivals can. Speak. Trust. Deceive. Then name your own mark. Only two will walk on."},
+    {"id": "VO_Stage2_Guess", "voice": "guardian", "text": "Silence. Name your symbol."},
+    {"id": "VO_Stage2_Elim", "voice": "guardian", "text": "Two champions remain. The race to the Guardian begins."},
+    {"id": "VO_Stage3_Brief", "voice": "guardian", "text": "The final trial. Two machines. One road. Reach me first, and you will choose first."},
+    {"id": "VO_Countdown", "voice": "guardian", "text": "Three. Two. One. Go!"},
+    {"id": "VO_Stage3_SuddenDeath", "voice": "guardian", "text": "Neither of you reached me. Again. The road is shorter now."},
+    {"id": "VO_Stage3_Arrived", "voice": "guardian", "text": "The switch is claimed. The first choice is earned."},
+    {"id": "VO_Final_Brief", "voice": "guardian", "text": "Hear my final law. Become the King, and the island is yours alone, but your people will not follow. Or save your people. Give your life, and your community is carried to safety. Choose."},
+    {"id": "VO_Final_Second", "voice": "guardian", "text": "A life is given. Now the choice passes to you."},
+    {"id": "VO_End_King", "voice": "narrator", "text": "A ruler is crowned. The island is claimed, but the fleet of their people turns back toward the burning sea. A victory, and a loss, that history will remember."},
+    {"id": "VO_End_SacrificeKing", "voice": "narrator", "text": "One champion gave everything, and their people were carried to safety. The other took the crown. Tonight, one community sleeps on solid ground."},
+    {"id": "VO_End_Double", "voice": "narrator", "text": "Two champions refused the crown. Both communities were saved. The island remains unclaimed, waiting for a world that has learned to share it."},
+    {"id": "VO_End_SoloSacrifice", "voice": "narrator", "text": "The last champion gave their life for their people. The island remains unclaimed, and the Guardian sleeps once more."},
+    {"id": "VO_Lobby_Ready", "voice": "guardian", "text": "Five champions. The trials begin."}
+  ]
+}

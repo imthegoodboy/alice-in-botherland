@@ -2,12 +2,26 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "",
+	"Description": "Alice in Botherland - The Last Island",
+	"Modules": [
+		{
+			"Name": "AliceInBotherland",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
 	"Plugins": [
 		{ "Name": "ModelingToolsEditorMode", "Enabled": true, "TargetAllowList": [ "Editor" ] },
 		{ "Name": "GameplayStateTree", "Enabled": true },
 		{ "Name": "ModelContextProtocol", "Enabled": true },
 		{ "Name": "AllToolsets", "Enabled": true },
-		{ "Name": "PythonScriptPlugin", "Enabled": true }
+		{ "Name": "PythonScriptPlugin", "Enabled": true },
+		{ "Name": "ChaosVehiclesPlugin", "Enabled": true },
+		{ "Name": "ProceduralMeshComponent", "Enabled": true },
+		{ "Name": "OnlineSubsystem", "Enabled": true },
+		{ "Name": "OnlineSubsystemUtils", "Enabled": true },
+		{ "Name": "OnlineSubsystemNull", "Enabled": true },
+		{ "Name": "OnlineSubsystemSteam", "Enabled": true },
+		{ "Name": "SteamSockets", "Enabled": true }
 	]
 }

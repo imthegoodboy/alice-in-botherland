@@ -1,0 +1,159 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v4.2.60",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "round_wooden_table_02"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "round_wooden_table_02",
+      "normalTexture": {
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Plane.006",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "round_wooden_table_02_nor_gl",
+      "uri": "textures/round_wooden_table_02_nor_gl_2k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "round_wooden_table_02_diff",
+      "uri": "textures/round_wooden_table_02_diff_2k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "round_wooden_table_02_metal-round_wooden_table_02_rough",
+      "uri": "textures/round_wooden_table_02_arm_2k.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3434,
+      "max": [
+        0.3980890214443207,
+        0.7460266351699829,
+        0.3980890214443207
+      ],
+      "min": [
+        -0.3980890214443207,
+        -4.383679197417223e-9,
+        -0.3980890214443207
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 3434,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 3434,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 12762,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 41208,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 41208,
+      "byteOffset": 41208,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 27472,
+      "byteOffset": 82416,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 25524,
+      "byteOffset": 109888,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 135412,
+      "uri": "round_wooden_table_02.bin"
+    }
+  ]
+}

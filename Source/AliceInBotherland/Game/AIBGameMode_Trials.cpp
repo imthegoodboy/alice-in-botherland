@@ -1,0 +1,486 @@
+// Alice in Botherland - server authority: Stage 1 (Number Game) and Stage 2 (Hidden Symbol)
+
+#include "Game/AIBGameMode.h"
+#include "Game/AIBGameState.h"
+#include "Game/AIBPlayerState.h"
+#include "Game/AIBBotController.h"
+#include "Player/AIBPlayerController.h"
+#include "Player/AIBCharacter.h"
+#include "World/AIBWorldSubsystem.h"
+#include "World/AIBNumberArena.h"
+#include "World/AIBHotelArena.h"
+#include "AliceInBotherland.h"
+#include "Engine/World.h"
+
+#define LOCTEXT_NAMESPACE "AIBTrials"
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Stage 1 - The Number Game
+// ---------------------------------------------------------------------------------------------------------------------
+
+void AAIBGameMode::Stage1_Enter()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	GS->Stage1Round = 0;
+	GS->bStage1SuddenDeath = false;
+	GS->Stage1Participants.Reset();
+	Stage1TiedRounds = 0;
+	GS->Stage1Last = FAIBStage1Round();
+	SetBotWander({}, FBox());
+
+	AAIBNumberArena* Arena = WorldSys() ? WorldSys()->GetNumberArena() : nullptr;
+	for (AAIBPlayerState* PS : ActivePlayers())
+	{
+		if (Arena)
+		{
+			TeleportSlot(PS->Slot, Arena->GetStandTransform(PS->Slot));
+		}
+	}
+	SetAllMovementLocked(true);
+
+	Cue(TEXT("SFX_Stinger_Title"));
+	Cue(TEXT("VO_Stage1_Brief"));
+	Cue(TEXT("MUS_Stage1"));
+	Announce(LOCTEXT("S1Title", "STAGE 1  -  THE NUMBER GAME"), LOCTEXT("S1Sub", "Pick 0-100. Target = average x 0.8. Farthest from the target is eliminated."), FLinearColor(1.f, 0.25f, 0.2f));
+}
+
+void AAIBGameMode::Stage1_BeginRound()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	const TArray<AAIBPlayerState*> Active = ActivePlayers();
+	if (!GS->bStage1SuddenDeath && Active.Num() <= AIB::Stage1Advance)
+	{
+		// A forfeit already brought us down to four: nobody else needs to fall here.
+		Announce(LOCTEXT("S1Skip", "THE NUMBER GAME ENDS"), LOCTEXT("S1SkipSub", "A champion already fell. Four remain."));
+		FadeToPhase(EAIBPhase::Stage2Briefing);
+		return;
+	}
+
+	GS->Stage1Round++;
+	if (!GS->bStage1SuddenDeath)
+	{
+		GS->Stage1Participants.Reset();
+		for (AAIBPlayerState* PS : Active)
+		{
+			GS->Stage1Participants.Add(PS->Slot);
+		}
+	}
+	else
+	{
+		// Only the tied players who are still active play the sudden death.
+		GS->Stage1Participants.RemoveAll([GS](int32 Slot)
+		{
+			const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
+			return !PS || !PS->IsActiveChampion();
+		});
+		if (GS->Stage1Participants.Num() < 2)
+		{
+			GS->bStage1SuddenDeath = false;
+			FadeToPhase(EAIBPhase::Stage2Briefing);
+			return;
+		}
+	}
+	for (int32 Slot : GS->Stage1Participants)
+	{
+		if (AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot))
+		{
+			PS->bSubmitted = false;
+			PS->PendingNumber = INDEX_NONE;
+		}
+	}
+	GS->Stage1Last = FAIBStage1Round();
+	GS->Stage1Last.Round = GS->Stage1Round;
+	GS->Stage1Last.bSuddenDeath = GS->bStage1SuddenDeath;
+	EnterPhase(EAIBPhase::Stage1RoundIntro);
+}
+
+void AAIBGameMode::SubmitNumber(AController* Controller, int32 Number)
+{
+	AAIBGameState* GS = GetAIBGameState();
+	AAIBPlayerState* PS = Controller ? Controller->GetPlayerState<AAIBPlayerState>() : nullptr;
+	if (!PS || GS->Phase != EAIBPhase::Stage1Selection || !GS->Stage1Participants.Contains(PS->Slot) || PS->bSubmitted || !PS->IsActiveChampion())
+	{
+		return;
+	}
+	PS->PendingNumber = FMath::Clamp(Number, 0, 100);
+	PS->bSubmitted = true;
+	PS->ForceNetUpdate();
+}
+
+void AAIBGameMode::Stage1_Resolve()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	FAIBStage1Round Round;
+	Round.Round = GS->Stage1Round;
+	Round.bSuddenDeath = GS->bStage1SuddenDeath;
+
+	float Sum = 0.f;
+	for (int32 Slot : GS->Stage1Participants)
+	{
+		AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
+		if (!PS)
+		{
+			continue;
+		}
+		FAIBNumberEntry Entry;
+		Entry.Slot = Slot;
+		if (PS->PendingNumber == INDEX_NONE)
+		{
+			// Rule shown before the match: no submission = random number.
+			Entry.Number = Random.RandRange(0, 100);
+			Entry.bAuto = true;
+		}
+		else
+		{
+			Entry.Number = PS->PendingNumber;
+		}
+		Sum += Entry.Number;
+		Round.Entries.Add(Entry);
+	}
+	if (Round.Entries.Num() == 0)
+	{
+		FadeToPhase(EAIBPhase::Stage2Briefing);
+		return;
+	}
+	Round.Average = Sum / Round.Entries.Num();
+	Round.Target = Round.Average * 0.8f;
+
+	float MinDist = TNumericLimits<float>::Max();
+	float MaxDist = -1.f;
+	for (FAIBNumberEntry& Entry : Round.Entries)
+	{
+		Entry.Distance = FMath::Abs(Entry.Number - Round.Target);
+		MinDist = FMath::Min(MinDist, Entry.Distance);
+		MaxDist = FMath::Max(MaxDist, Entry.Distance);
+	}
+	TArray<int32> Farthest;
+	for (FAIBNumberEntry& Entry : Round.Entries)
+	{
+		Entry.bWinner = FMath::IsNearlyEqual(Entry.Distance, MinDist, 0.001f);
+		Entry.bFarthest = FMath::IsNearlyEqual(Entry.Distance, MaxDist, 0.001f);
+		AAIBPlayerState* PS = GS->GetPlayerBySlot(Entry.Slot);
+		if (Entry.bWinner && PS)
+		{
+			PS->Stage1Wins++;
+		}
+		else if (PS)
+		{
+			PS->Lives = FMath::Max(0, PS->Lives - 1);
+		}
+		if (Entry.bFarthest)
+		{
+			Farthest.Add(Entry.Slot);
+		}
+	}
+	if (Farthest.Num() == 1)
+	{
+		Round.EliminatedSlot = Farthest[0];
+	}
+	else
+	{
+		Round.TiedSlots = Farthest;
+	}
+	GS->Stage1Last = Round;
+	GS->ForceNetUpdate();
+	Cue(TEXT("SFX_NumberRoll"));
+	EnterPhase(EAIBPhase::Stage1Reveal);
+}
+
+void AAIBGameMode::Stage1_AfterResults()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	const FAIBStage1Round& Round = GS->Stage1Last;
+	// Sudden death that keeps tying (everyone picking the same number) is settled by lot after a few rounds.
+	const bool bLot = Round.EliminatedSlot == INDEX_NONE && GS->bStage1SuddenDeath && ++Stage1TiedRounds >= 3 && Round.TiedSlots.Num() > 0;
+	const int32 LoserSlot = bLot ? Round.TiedSlots[Random.RandRange(0, Round.TiedSlots.Num() - 1)] : Round.EliminatedSlot;
+	if (LoserSlot != INDEX_NONE)
+	{
+		AAIBPlayerState* Loser = GS->GetPlayerBySlot(LoserSlot);
+		Eliminate(Loser, 1, false);
+		GS->bStage1SuddenDeath = false;
+		Stage1TiedRounds = 0;
+		const int32 Remaining = GS->CountActive();
+		Announce(FText::Format(LOCTEXT("S1Elim", "{0} HAS BEEN ELIMINATED"), FText::FromString(Loser ? Loser->GetPlayerName().ToUpper() : FString())),
+			bLot ? FText::Format(LOCTEXT("S1ElimLot", "Tied again - the Guardian cast lots. {0} champions remain."), FText::AsNumber(Remaining))
+				: FText::Format(LOCTEXT("S1ElimSub", "{0} champions remain."), FText::AsNumber(Remaining)), FLinearColor(1.f, 0.15f, 0.15f));
+		Cue(TEXT("SFX_Elimination"));
+		Cue(TEXT("VO_Stage1_Elim"));
+		EnterPhase(EAIBPhase::Stage1Elimination);
+		return;
+	}
+
+	// Tie for farthest: those players face sudden death.
+	GS->bStage1SuddenDeath = true;
+	GS->Stage1Participants = Round.TiedSlots;
+	FString Names;
+	for (int32 Slot : Round.TiedSlots)
+	{
+		if (const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot))
+		{
+			Names += (Names.IsEmpty() ? TEXT("") : TEXT("  vs  ")) + PS->GetPlayerName();
+		}
+	}
+	Announce(LOCTEXT("S1Sudden", "SUDDEN DEATH"), FText::FromString(Names), FLinearColor(1.f, 0.4f, 0.1f));
+	Cue(TEXT("VO_Stage1_SuddenDeath"));
+	Stage1_BeginRound();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Stage 2 - The Hidden Symbol
+// ---------------------------------------------------------------------------------------------------------------------
+
+void AAIBGameMode::Stage2_Enter()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	GS->Stage2Round = 0;
+	GS->bStage2SuddenDeath = false;
+	GS->Stage2Participants.Reset();
+	GS->Stage2Last.Reset();
+	Stage2Qualified.Reset();
+	Stage2Contenders.Reset();
+	Stage2SpotsLeft = AIB::Stage2Advance;
+
+	const TArray<AAIBPlayerState*> Active = ActivePlayers();
+	AAIBHotelArena* Hotel = WorldSys() ? WorldSys()->GetHotel() : nullptr;
+	for (int32 Index = 0; Index < Active.Num(); ++Index)
+	{
+		AAIBPlayerState* PS = Active[Index];
+		PS->Stage2Points = 0;
+		Stage2Contenders.Add(PS->Slot);
+		if (Hotel)
+		{
+			TeleportSlot(PS->Slot, Hotel->GetSpawn(Index, Active.Num()));
+		}
+	}
+	SetAllMovementLocked(false);
+	if (Hotel)
+	{
+		SetBotWander(Hotel->GetWanderPoints(), Hotel->GetWalkBounds());
+	}
+
+	Cue(TEXT("SFX_Stinger_Title"));
+	Cue(TEXT("VO_Stage2_Brief"));
+	Cue(TEXT("MUS_Stage2"));
+	Announce(LOCTEXT("S2Title", "STAGE 2  -  THE HIDDEN SYMBOL"),
+		LOCTEXT("S2Sub", "Everyone sees your symbol except you. Talk, trust, deceive. Top two advance."), FLinearColor(0.6f, 0.75f, 1.f));
+}
+
+void AAIBGameMode::Stage2_BeginRound()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	if (!GS->bStage2SuddenDeath && GS->CountActive() <= AIB::Stage2Advance)
+	{
+		Announce(LOCTEXT("S2Skip", "THE HIDDEN SYMBOL ENDS"), LOCTEXT("S2SkipSub", "Only two champions remain."));
+		FadeToPhase(EAIBPhase::Stage3Briefing);
+		return;
+	}
+	GS->Stage2Round++;
+	GS->Stage2Participants.Reset();
+	for (int32 Slot : Stage2Contenders)
+	{
+		const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
+		if (PS && PS->IsActiveChampion())
+		{
+			GS->Stage2Participants.Add(Slot);
+		}
+	}
+	GS->Stage2Last.Reset();
+	Stage2Claims.Reset();
+	for (int32 Slot : GS->Stage2Participants)
+	{
+		AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
+		// Independent draw (repeats allowed) so nobody can deduce their own symbol from the others.
+		PS->HiddenSymbol = static_cast<EAIBSymbol>(Random.RandRange(1, 4));
+		PS->PendingGuess = EAIBSymbol::None;
+		PS->bSubmitted = false;
+	}
+	Stage2_SendSymbolViews();
+
+	const FText RoundText = GS->bStage2SuddenDeath
+		? LOCTEXT("S2Sudden", "SUDDEN DEATH SYMBOL ROUND")
+		: FText::Format(LOCTEXT("S2Round", "SYMBOL ROUND {0} OF {1}"), FText::AsNumber(GS->Stage2Round), FText::AsNumber(AIB::Stage2Rounds));
+	Announce(RoundText, LOCTEXT("S2RoundSub", "30 seconds to talk. Use the chat or the quick-tell buttons."), FLinearColor(0.6f, 0.75f, 1.f));
+	EnterPhase(EAIBPhase::Stage2Communication);
+}
+
+void AAIBGameMode::Stage2_SendSymbolViews()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AAIBPlayerController* PC = Cast<AAIBPlayerController>(It->Get());
+		if (!PC)
+		{
+			continue;
+		}
+		const AAIBPlayerState* Viewer = PC->GetPlayerState<AAIBPlayerState>();
+		const int32 ViewerSlot = Viewer ? Viewer->Slot : INDEX_NONE;
+		const bool bViewerCompeting = GS->Stage2Participants.Contains(ViewerSlot);
+		TArray<FAIBSymbolView> Views;
+		for (int32 Slot : GS->Stage2Participants)
+		{
+			// The server never sends a champion their own symbol.
+			if (bViewerCompeting && Slot == ViewerSlot)
+			{
+				continue;
+			}
+			if (const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot))
+			{
+				FAIBSymbolView View;
+				View.Slot = Slot;
+				View.Symbol = PS->HiddenSymbol;
+				Views.Add(View);
+			}
+		}
+		PC->ClientReceiveSymbols(Views);
+	}
+}
+
+void AAIBGameMode::SubmitGuess(AController* Controller, EAIBSymbol Guess)
+{
+	AAIBGameState* GS = GetAIBGameState();
+	AAIBPlayerState* PS = Controller ? Controller->GetPlayerState<AAIBPlayerState>() : nullptr;
+	if (!PS || GS->Phase != EAIBPhase::Stage2Guess || !GS->Stage2Participants.Contains(PS->Slot) || PS->bSubmitted || Guess == EAIBSymbol::None)
+	{
+		return;
+	}
+	PS->PendingGuess = Guess;
+	PS->bSubmitted = true;
+	PS->ForceNetUpdate();
+}
+
+void AAIBGameMode::Stage2_Resolve()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	GS->Stage2Last.Reset();
+	for (int32 Slot : GS->Stage2Participants)
+	{
+		AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
+		if (!PS)
+		{
+			continue;
+		}
+		FAIBSymbolResult Result;
+		Result.Slot = Slot;
+		Result.Actual = PS->HiddenSymbol;
+		Result.Guess = PS->PendingGuess;
+		Result.bCorrect = PS->PendingGuess != EAIBSymbol::None && PS->PendingGuess == PS->HiddenSymbol;
+		if (Result.bCorrect)
+		{
+			PS->Stage2Points++;
+		}
+		GS->Stage2Last.Add(Result);
+	}
+	UpdateBotTrust();
+	GS->ForceNetUpdate();
+	Cue(TEXT("SFX_Whoosh_Reveal"));
+	EnterPhase(EAIBPhase::Stage2Results);
+}
+
+void AAIBGameMode::Stage2_AfterResults()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	if (!GS->bStage2SuddenDeath && GS->Stage2Round < AIB::Stage2Rounds)
+	{
+		Stage2_BeginRound();
+		return;
+	}
+
+	// Rank the contenders for the remaining spots.
+	TArray<AAIBPlayerState*> Ranked;
+	for (int32 Slot : Stage2Contenders)
+	{
+		AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
+		if (PS && PS->IsActiveChampion())
+		{
+			Ranked.Add(PS);
+		}
+	}
+	Ranked.Sort([](const AAIBPlayerState& A, const AAIBPlayerState& B) { return A.Stage2Points > B.Stage2Points; });
+
+	bool bResolved = true;
+	if (Ranked.Num() > Stage2SpotsLeft && Stage2SpotsLeft > 0)
+	{
+		const int32 Cutoff = Ranked[Stage2SpotsLeft - 1]->Stage2Points;
+		TArray<AAIBPlayerState*> Above, Tied, Below;
+		for (AAIBPlayerState* PS : Ranked)
+		{
+			(PS->Stage2Points > Cutoff ? Above : PS->Stage2Points == Cutoff ? Tied : Below).Add(PS);
+		}
+		const int32 TiedSpots = Stage2SpotsLeft - Above.Num();
+		for (AAIBPlayerState* PS : Above)
+		{
+			Stage2Qualified.AddUnique(PS->Slot);
+		}
+		for (AAIBPlayerState* PS : Below)
+		{
+			Eliminate(PS, 2, false);
+		}
+		const bool bTooManySuddenDeaths = GS->Stage2Round >= AIB::Stage2Rounds + 4;
+		if (Tied.Num() > TiedSpots && !bTooManySuddenDeaths)
+		{
+			Stage2SpotsLeft = TiedSpots;
+			Stage2Contenders.Reset();
+			FString Names;
+			for (AAIBPlayerState* PS : Tied)
+			{
+				Stage2Contenders.Add(PS->Slot);
+				Names += (Names.IsEmpty() ? TEXT("") : TEXT("  vs  ")) + PS->GetPlayerName();
+			}
+			GS->bStage2SuddenDeath = true;
+			bResolved = false;
+			Announce(LOCTEXT("S2Tie", "TIE FOR THE FINAL"), FText::FromString(Names), FLinearColor(1.f, 0.6f, 0.2f));
+			Stage2_BeginRound();
+			return;
+		}
+		// Still tied after many rounds: the Guardian decides by lot.
+		while (Tied.Num() > TiedSpots)
+		{
+			Eliminate(Tied[Random.RandRange(0, Tied.Num() - 1)] , 2, false);
+			Tied.RemoveAll([](const AAIBPlayerState* PS) { return !PS->IsActiveChampion(); });
+		}
+		for (AAIBPlayerState* PS : Tied)
+		{
+			Stage2Qualified.AddUnique(PS->Slot);
+		}
+	}
+	else
+	{
+		for (AAIBPlayerState* PS : Ranked)
+		{
+			Stage2Qualified.AddUnique(PS->Slot);
+		}
+	}
+
+	if (bResolved)
+	{
+		// Everyone not qualified is out.
+		for (AAIBPlayerState* PS : ActivePlayers())
+		{
+			if (!Stage2Qualified.Contains(PS->Slot))
+			{
+				Eliminate(PS, 2, false);
+			}
+		}
+		GS->bStage2SuddenDeath = false;
+		// Clear private symbol views.
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (AAIBPlayerController* PC = Cast<AAIBPlayerController>(It->Get()))
+			{
+				PC->ClientReceiveSymbols({});
+			}
+		}
+		FString Names;
+		for (AAIBPlayerState* PS : ActivePlayers())
+		{
+			Names += (Names.IsEmpty() ? TEXT("") : TEXT("  &  ")) + PS->GetPlayerName();
+		}
+		Announce(LOCTEXT("S2Elim", "TWO CHAMPIONS REMAIN"), FText::Format(LOCTEXT("S2ElimSub", "{0}. The race to the Guardian begins."), FText::FromString(Names)), FLinearColor(1.f, 0.85f, 0.4f));
+		Cue(TEXT("SFX_Elimination"));
+		Cue(TEXT("VO_Stage2_Elim"));
+		EnterPhase(EAIBPhase::Stage2Elimination);
+	}
+}
+
+#undef LOCTEXT_NAMESPACE

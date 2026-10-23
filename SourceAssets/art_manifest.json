@@ -1,0 +1,1740 @@
+{
+ "generated": "2026-10-23",
+ "conventions": {
+  "units": "metres, real-world scale (glTF); Unreal glTF/Interchange import converts to cm automatically",
+  "axes": "All facings are given in Blender space (Z-up, front = -Y unless stated). The glTF files are Y-up; the Unreal glTF importer converts back to Z-up - check the yaw of one asset after import (a 90/180 deg yaw offset may be needed) and apply the same correction to all.",
+  "custom_models": "origin bottom-centre unless noted; transforms applied; weighted custom normals; plain placeholder materials named per slot (replace in Unreal)"
+ },
+ "polyhaven_models": [
+  {
+   "id": "dutch_ship_large_01",
+   "gltf": "SourceAssets/PolyHaven/dutch_ship_large_01/dutch_ship_large_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    34.251,
+    8.387,
+    32.079
+   ],
+   "bounds_min_m": [
+    -13.837,
+    -4.291,
+    -1.916
+   ],
+   "bounds_max_m": [
+    20.415,
+    4.096,
+    30.163
+   ],
+   "tris": 110616,
+   "mesh_objects": 3,
+   "materials": [
+    "dutch_ship_large_01_hull",
+    "dutch_ship_large_01_rigging",
+    "dutch_ship_large_01_sails"
+   ],
+   "facing": "bow +X (stern castle at -X)",
+   "notes": "3-masted Dutch galleon/fluyt, high carved stern castle, weathered dark timber, sails mostly furled with a few ragged/partly set; reads as an old anchored/derelict ship. Hull extends ~1.9 m below z=0 (origin ~ waterline). Best \"old ship\" pick.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\dutch_ship_large_01.png"
+  },
+  {
+   "id": "dutch_ship_large_02",
+   "gltf": "SourceAssets/PolyHaven/dutch_ship_large_02/dutch_ship_large_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    8.538,
+    34.251,
+    32.079
+   ],
+   "bounds_min_m": [
+    -4.194,
+    -20.426,
+    -1.916
+   ],
+   "bounds_max_m": [
+    4.344,
+    13.825,
+    30.163
+   ],
+   "tris": 96506,
+   "mesh_objects": 3,
+   "materials": [
+    "dutch_ship_large_02_hull",
+    "dutch_ship_large_02_rigging",
+    "dutch_ship_large_02_sails"
+   ],
+   "facing": "bow -Y (stern at +Y)",
+   "notes": "Same hull/rig as dutch_ship_large_01 but modelled along Y with more sails set (light canvas). Use as a sailing variant. ~1.9 m below z=0.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\dutch_ship_large_02.png"
+  },
+  {
+   "id": "dutch_ship_medium",
+   "gltf": "SourceAssets/PolyHaven/dutch_ship_medium/dutch_ship_medium_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    24.07,
+    6.809,
+    24.657
+   ],
+   "bounds_min_m": [
+    -10.326,
+    -3.321,
+    -2.0
+   ],
+   "bounds_max_m": [
+    13.745,
+    3.488,
+    22.657
+   ],
+   "tris": 69162,
+   "mesh_objects": 3,
+   "materials": [
+    "dutch_ship_medium_hull",
+    "dutch_ship_medium_rigging",
+    "dutch_ship_medium_sails"
+   ],
+   "facing": "bow +X (stern at -X)",
+   "notes": "Smaller 3-masted Dutch ship, same style/condition as the large ones, sails partly furled. ~2 m below z=0. Good for mid-distance/background fleet.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\dutch_ship_medium.png"
+  },
+  {
+   "id": "ship_pinnace",
+   "gltf": "SourceAssets/PolyHaven/ship_pinnace/ship_pinnace_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    9.527,
+    39.789,
+    32.575
+   ],
+   "bounds_min_m": [
+    -4.75,
+    -20.857,
+    -2.412
+   ],
+   "bounds_max_m": [
+    4.776,
+    18.932,
+    30.163
+   ],
+   "tris": 168317,
+   "mesh_objects": 7,
+   "materials": [
+    "ship_pinnace_aft",
+    "ship_pinnace_deck",
+    "ship_pinnace_details",
+    "ship_pinnace_hull",
+    "ship_pinnace_interior",
+    "ship_pinnace_rigging",
+    "ship_pinnace_sails"
+   ],
+   "facing": "bow -Y (ornate stern at +Y)",
+   "notes": "Largest and heaviest: full-rigged 3-masted ship with all sails set, darker hull, ornate stern galleries, intact condition. ~2.4 m below z=0. Hero ship / ghost-ship candidate (168k tris, 7 meshes).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\ship_pinnace.png"
+  },
+  {
+   "id": "coastal_cliff_01",
+   "gltf": "SourceAssets/PolyHaven/coastal_cliff_01/coastal_cliff_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    91.98,
+    10.967,
+    10.326
+   ],
+   "bounds_min_m": [
+    -45.056,
+    -4.761,
+    -0.65
+   ],
+   "bounds_max_m": [
+    46.924,
+    6.206,
+    9.676
+   ],
+   "tris": 461824,
+   "mesh_objects": 1,
+   "materials": [
+    "coastal_cliff_01"
+   ],
+   "facing": "long axis X; cliff face side not verified",
+   "notes": "Photoscan coastal cliff strip. High poly: enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coastal_cliff_01.png"
+  },
+  {
+   "id": "coastal_cliff_02",
+   "gltf": "SourceAssets/PolyHaven/coastal_cliff_02/coastal_cliff_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    40.928,
+    8.648,
+    10.053
+   ],
+   "bounds_min_m": [
+    -20.515,
+    -4.153,
+    -0.228
+   ],
+   "bounds_max_m": [
+    20.412,
+    4.495,
+    9.825
+   ],
+   "tris": 943284,
+   "mesh_objects": 1,
+   "materials": [
+    "coastal_cliff_02"
+   ],
+   "facing": "long axis X; cliff face side not verified",
+   "notes": "Photoscan coastal cliff. ~0.94M tris: enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coastal_cliff_02.png"
+  },
+  {
+   "id": "coastal_cliff_04",
+   "gltf": "SourceAssets/PolyHaven/coastal_cliff_04/coastal_cliff_04_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    86.772,
+    24.247,
+    11.0
+   ],
+   "bounds_min_m": [
+    -47.425,
+    -15.21,
+    -0.648
+   ],
+   "bounds_max_m": [
+    39.347,
+    9.038,
+    10.352
+   ],
+   "tris": 1537926,
+   "mesh_objects": 1,
+   "materials": [
+    "coastal_cliff_04"
+   ],
+   "facing": "long axis X; cliff face side not verified",
+   "notes": "Large photoscan cliff (87 m long). ~1.54M tris: enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coastal_cliff_04.png"
+  },
+  {
+   "id": "coast_rocks_01",
+   "gltf": "SourceAssets/PolyHaven/coast_rocks_01/coast_rocks_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    59.507,
+    42.52,
+    3.289
+   ],
+   "bounds_min_m": [
+    -32.152,
+    -15.625,
+    -1.978
+   ],
+   "bounds_max_m": [
+    27.355,
+    26.894,
+    1.311
+   ],
+   "tris": 679936,
+   "mesh_objects": 1,
+   "materials": [
+    "coast_rocks_01"
+   ],
+   "facing": "n/a (terrain patch)",
+   "notes": "Rocky shoreline patch. ~0.68M tris: enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coast_rocks_01.png"
+  },
+  {
+   "id": "coast_rocks_02",
+   "gltf": "SourceAssets/PolyHaven/coast_rocks_02/coast_rocks_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    45.965,
+    49.465,
+    3.171
+   ],
+   "bounds_min_m": [
+    -29.023,
+    -33.775,
+    -0.92
+   ],
+   "bounds_max_m": [
+    16.942,
+    15.69,
+    2.252
+   ],
+   "tris": 1260423,
+   "mesh_objects": 1,
+   "materials": [
+    "coast_rocks_02"
+   ],
+   "facing": "n/a (terrain patch)",
+   "notes": "Rocky shoreline patch. ~1.26M tris: enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coast_rocks_02.png"
+  },
+  {
+   "id": "coast_line_01",
+   "gltf": "SourceAssets/PolyHaven/coast_line_01/coast_line_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    54.612,
+    42.964,
+    2.634
+   ],
+   "bounds_min_m": [
+    -26.139,
+    -22.201,
+    -1.168
+   ],
+   "bounds_max_m": [
+    28.473,
+    20.763,
+    1.466
+   ],
+   "tris": 539491,
+   "mesh_objects": 1,
+   "materials": [
+    "coast_line_01"
+   ],
+   "facing": "n/a (terrain patch)",
+   "notes": "Shoreline/beach patch. ~0.54M tris: enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coast_line_01.png"
+  },
+  {
+   "id": "coast_land_rocks_02",
+   "gltf": "SourceAssets/PolyHaven/coast_land_rocks_02/coast_land_rocks_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    4.889,
+    10.454,
+    1.398
+   ],
+   "bounds_min_m": [
+    -2.448,
+    -5.457,
+    -0.155
+   ],
+   "bounds_max_m": [
+    2.441,
+    4.998,
+    1.243
+   ],
+   "tris": 1291146,
+   "mesh_objects": 1,
+   "materials": [
+    "coast_land_rocks_02"
+   ],
+   "facing": "n/a (terrain patch)",
+   "notes": "Rock/land transition patch (small but dense, ~1.29M tris): enable Nanite.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coast_land_rocks_02.png"
+  },
+  {
+   "id": "modular_wooden_pier",
+   "gltf": "SourceAssets/PolyHaven/modular_wooden_pier/modular_wooden_pier_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    3.102,
+    19.026,
+    7.516
+   ],
+   "bounds_min_m": [
+    -1.527,
+    -7.052,
+    -0.994
+   ],
+   "bounds_max_m": [
+    1.575,
+    11.974,
+    6.522
+   ],
+   "tris": 84780,
+   "mesh_objects": 7,
+   "materials": [
+    "modular_wooden_pier_planks",
+    "modular_wooden_pier_poles",
+    "modular_wooden_pier_poles.001"
+   ],
+   "facing": "long axis Y",
+   "notes": "Weathered wooden pier modules (deck sections, pilings, a gallows-style post with rope) - 7 separate meshes spread along Y; pilings go ~1 m below z=0.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\modular_wooden_pier.png"
+  },
+  {
+   "id": "wooden_barrels_01",
+   "gltf": "SourceAssets/PolyHaven/wooden_barrels_01/wooden_barrels_01_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    4.44,
+    3.345,
+    0.957
+   ],
+   "bounds_min_m": [
+    -2.332,
+    -1.412,
+    -0.04
+   ],
+   "bounds_max_m": [
+    2.108,
+    1.933,
+    0.917
+   ],
+   "tris": 33142,
+   "mesh_objects": 19,
+   "materials": [
+    "wooden_barrels_01_barrel01",
+    "wooden_barrels_01_barrel02",
+    "wooden_barrels_01_pieces"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Group of 19 barrel meshes laid out side by side (split/arrange in engine).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\wooden_barrels_01.png"
+  },
+  {
+   "id": "wooden_crate_01",
+   "gltf": "SourceAssets/PolyHaven/wooden_crate_01/wooden_crate_01_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.825,
+    0.409,
+    0.35
+   ],
+   "bounds_min_m": [
+    -0.413,
+    -0.213,
+    -0.008
+   ],
+   "bounds_max_m": [
+    0.413,
+    0.196,
+    0.342
+   ],
+   "tris": 6576,
+   "mesh_objects": 3,
+   "materials": [
+    "wooden_crate_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Rope-handled wooden chest/crate, latch on -Y.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\wooden_crate_01.png"
+  },
+  {
+   "id": "wooden_crate_02",
+   "gltf": "SourceAssets/PolyHaven/wooden_crate_02/wooden_crate_02_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.529,
+    1.166,
+    0.464
+   ],
+   "bounds_min_m": [
+    -0.265,
+    -0.583,
+    -0.01
+   ],
+   "bounds_max_m": [
+    0.265,
+    0.583,
+    0.454
+   ],
+   "tris": 5176,
+   "mesh_objects": 2,
+   "materials": [
+    "wooden_crate_02"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Long wooden crate.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\wooden_crate_02.png"
+  },
+  {
+   "id": "lateral_sea_marker",
+   "gltf": "SourceAssets/PolyHaven/lateral_sea_marker/lateral_sea_marker_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    3.005,
+    3.005,
+    6.839
+   ],
+   "bounds_min_m": [
+    -1.502,
+    -1.502,
+    -1.282
+   ],
+   "bounds_max_m": [
+    1.502,
+    1.502,
+    5.557
+   ],
+   "tris": 13014,
+   "mesh_objects": 1,
+   "materials": [
+    "lateral_sea_marker"
+   ],
+   "facing": "symmetric (axis Z)",
+   "notes": "Navigation sea marker/buoy tower; ~1.3 m below z=0 (float line).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\lateral_sea_marker.png"
+  },
+  {
+   "id": "ocean_buoy",
+   "gltf": "SourceAssets/PolyHaven/ocean_buoy/ocean_buoy_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    1.067,
+    0.952,
+    2.656
+   ],
+   "bounds_min_m": [
+    -0.476,
+    -0.476,
+    -0.809
+   ],
+   "bounds_max_m": [
+    0.591,
+    0.476,
+    1.847
+   ],
+   "tris": 12240,
+   "mesh_objects": 1,
+   "materials": [
+    "buoy"
+   ],
+   "facing": "symmetric (axis Z)",
+   "notes": "Ocean buoy; ~0.8 m below z=0 (float line).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\ocean_buoy.png"
+  },
+  {
+   "id": "wooden_lantern_01",
+   "gltf": "SourceAssets/PolyHaven/wooden_lantern_01/wooden_lantern_01_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.221,
+    0.235,
+    0.53
+   ],
+   "bounds_min_m": [
+    -0.111,
+    -0.124,
+    -0.011
+   ],
+   "bounds_max_m": [
+    0.111,
+    0.111,
+    0.519
+   ],
+   "tris": 8321,
+   "mesh_objects": 3,
+   "materials": [
+    "wooden_lantern_01",
+    "wooden_lantern_01_glass"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Small wooden lantern prop.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\wooden_lantern_01.png"
+  },
+  {
+   "id": "gothic_statue",
+   "gltf": "SourceAssets/PolyHaven/gothic_statue/gothic_statue_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    1.477,
+    1.564,
+    1.74
+   ],
+   "bounds_min_m": [
+    -0.783,
+    -0.374,
+    -0.016
+   ],
+   "bounds_max_m": [
+    0.694,
+    1.189,
+    1.724
+   ],
+   "tris": 27739,
+   "mesh_objects": 1,
+   "materials": [
+    "gothic_statue"
+   ],
+   "facing": "figure faces -Y (robe/chain trails to +Y)",
+   "notes": "Photoscanned, weathered bronze/stone full-body statue of a crowned, veiled, robed queen holding an open book, chains draped over her, robe pooling on the ground. Excellent full-body figure and fits the card-royalty motif; scale x4.6 for an 8 m colossus (consider the 4k download for that size). Not hooded and no sword.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\gothic_statue.png"
+  },
+  {
+   "id": "marble_bust_01",
+   "gltf": "SourceAssets/PolyHaven/marble_bust_01/marble_bust_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    0.272,
+    0.3,
+    0.515
+   ],
+   "bounds_min_m": [
+    -0.123,
+    -0.155,
+    0.0
+   ],
+   "bounds_max_m": [
+    0.149,
+    0.145,
+    0.515
+   ],
+   "tris": 17456,
+   "mesh_objects": 1,
+   "materials": [
+    "marble_bust_01"
+   ],
+   "facing": "faces -Y",
+   "notes": "Classical Roman-style male marble bust on a round socle, clean condition. Head/shoulders only - lobby decor, not a Guardian.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\marble_bust_01.png"
+  },
+  {
+   "id": "lion_head",
+   "gltf": "SourceAssets/PolyHaven/lion_head/lion_head_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    0.321,
+    0.207,
+    0.436
+   ],
+   "bounds_min_m": [
+    -0.162,
+    -0.103,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.159,
+    0.103,
+    0.436
+   ],
+   "tris": 47214,
+   "mesh_objects": 1,
+   "materials": [
+    "lion_head"
+   ],
+   "facing": "faces -Y",
+   "notes": "Dark bronze lion-head sculpture (full mane) on a black square plinth. Decor/wall ornament, not a full figure.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\lion_head.png"
+  },
+  {
+   "id": "Chandelier_01",
+   "gltf": "SourceAssets/PolyHaven/Chandelier_01/Chandelier_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    0.746,
+    0.816,
+    0.798
+   ],
+   "bounds_min_m": [
+    -0.373,
+    -0.413,
+    -0.798
+   ],
+   "bounds_max_m": [
+    0.373,
+    0.402,
+    0.0
+   ],
+   "tris": 26860,
+   "mesh_objects": 1,
+   "materials": [
+    "basecolor_classic_chandelier_1",
+    "lamps_classic_chandelier_1"
+   ],
+   "facing": "symmetric (hangs from origin)",
+   "notes": "Brass 6-arm chandelier with white fabric shades and crystal drops; origin at the ceiling hook (geometry from z -0.80 to 0). Classic hotel look.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\Chandelier_01.png"
+  },
+  {
+   "id": "Chandelier_02",
+   "gltf": "SourceAssets/PolyHaven/Chandelier_02/Chandelier_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    0.679,
+    0.619,
+    0.848
+   ],
+   "bounds_min_m": [
+    -0.34,
+    -0.313,
+    0.06
+   ],
+   "bounds_max_m": [
+    0.339,
+    0.306,
+    0.908
+   ],
+   "tris": 21514,
+   "mesh_objects": 1,
+   "materials": [
+    "Chandelier_02",
+    "Chandelier_02_bulb"
+   ],
+   "facing": "symmetric",
+   "notes": "Brass 5-arm chandelier with white shades on a long drop rod; NOTE origin is below the mesh (z 0.06..0.91) - re-pivot to the top hook in engine.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\Chandelier_02.png"
+  },
+  {
+   "id": "Sofa_01",
+   "gltf": "SourceAssets/PolyHaven/Sofa_01/Sofa_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    1.571,
+    0.658,
+    0.797
+   ],
+   "bounds_min_m": [
+    -0.778,
+    -0.297,
+    -0.001
+   ],
+   "bounds_max_m": [
+    0.793,
+    0.361,
+    0.796
+   ],
+   "tris": 4101,
+   "mesh_objects": 1,
+   "materials": [
+    "Sofa_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Cream Louis-style carved sofa.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\Sofa_01.png"
+  },
+  {
+   "id": "sofa_02",
+   "gltf": "SourceAssets/PolyHaven/sofa_02/sofa_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    1.807,
+    0.818,
+    0.709
+   ],
+   "bounds_min_m": [
+    -0.903,
+    -0.34,
+    0.0
+   ],
+   "bounds_max_m": [
+    0.904,
+    0.478,
+    0.71
+   ],
+   "tris": 2728,
+   "mesh_objects": 2,
+   "materials": [
+    "sofa_02"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Black tufted leather Chesterfield-style sofa.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\sofa_02.png"
+  },
+  {
+   "id": "ArmChair_01",
+   "gltf": "SourceAssets/PolyHaven/ArmChair_01/ArmChair_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    0.848,
+    0.766,
+    1.065
+   ],
+   "bounds_min_m": [
+    -0.424,
+    -0.348,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.424,
+    0.417,
+    1.065
+   ],
+   "tris": 5626,
+   "mesh_objects": 1,
+   "materials": [
+    "Armchair_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Cream upholstered carved armchair.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\ArmChair_01.png"
+  },
+  {
+   "id": "ClassicConsole_01",
+   "gltf": "SourceAssets/PolyHaven/ClassicConsole_01/ClassicConsole_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    1.543,
+    0.589,
+    0.949
+   ],
+   "bounds_min_m": [
+    -0.771,
+    -0.251,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.772,
+    0.338,
+    0.949
+   ],
+   "tris": 7566,
+   "mesh_objects": 1,
+   "materials": [
+    "ClassicConsole_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Black carved baroque console table.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\ClassicConsole_01.png"
+  },
+  {
+   "id": "GothicCabinet_01",
+   "gltf": "SourceAssets/PolyHaven/GothicCabinet_01/GothicCabinet_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    1.719,
+    1.117,
+    2.361
+   ],
+   "bounds_min_m": [
+    -0.86,
+    -0.659,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.86,
+    0.457,
+    2.361
+   ],
+   "tris": 12170,
+   "mesh_objects": 5,
+   "materials": [
+    "GothicCabinet_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Dark carved gothic two-tier cabinet (2.36 m tall).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\GothicCabinet_01.png"
+  },
+  {
+   "id": "coffee_table_round_01",
+   "gltf": "SourceAssets/PolyHaven/coffee_table_round_01/coffee_table_round_01_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    1.301,
+    1.301,
+    0.491
+   ],
+   "bounds_min_m": [
+    -0.651,
+    -0.651,
+    -0.001
+   ],
+   "bounds_max_m": [
+    0.651,
+    0.651,
+    0.49
+   ],
+   "tris": 4044,
+   "mesh_objects": 1,
+   "materials": [
+    "coffee_table_round_01"
+   ],
+   "facing": "symmetric",
+   "notes": "Round coffee table.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\coffee_table_round_01.png"
+  },
+  {
+   "id": "Ottoman_01",
+   "gltf": "SourceAssets/PolyHaven/Ottoman_01/Ottoman_01_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.885,
+    0.621,
+    0.624
+   ],
+   "bounds_min_m": [
+    -0.44,
+    -0.311,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.444,
+    0.31,
+    0.624
+   ],
+   "tris": 4240,
+   "mesh_objects": 1,
+   "materials": [
+    "Ottoman_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Dark leather ottoman.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\Ottoman_01.png"
+  },
+  {
+   "id": "GreenChair_01",
+   "gltf": "SourceAssets/PolyHaven/GreenChair_01/GreenChair_01_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.673,
+    0.664,
+    1.059
+   ],
+   "bounds_min_m": [
+    -0.337,
+    -0.286,
+    -0.001
+   ],
+   "bounds_max_m": [
+    0.336,
+    0.378,
+    1.058
+   ],
+   "tris": 4213,
+   "mesh_objects": 1,
+   "materials": [
+    "GreenChair_01"
+   ],
+   "facing": "front faces -Y (Poly Haven / Blender front-view convention)",
+   "notes": "Green velvet carved armchair.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\GreenChair_01.png"
+  },
+  {
+   "id": "industrial_wall_lamp",
+   "gltf": "SourceAssets/PolyHaven/industrial_wall_lamp/industrial_wall_lamp_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.273,
+    0.14,
+    0.43
+   ],
+   "bounds_min_m": [
+    -0.137,
+    -0.14,
+    -0.215
+   ],
+   "bounds_max_m": [
+    0.137,
+    -0.0,
+    0.215
+   ],
+   "tris": 4446,
+   "mesh_objects": 1,
+   "materials": [
+    "industrial_wall_lamp",
+    "industrial_wall_lamp_glass"
+   ],
+   "facing": "faces -Y (wall plate at y=0)",
+   "notes": "Caged bulkhead wall lamp; origin at the wall mount.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\industrial_wall_lamp.png"
+  },
+  {
+   "id": "vintage_oil_lamp",
+   "gltf": "SourceAssets/PolyHaven/vintage_oil_lamp/vintage_oil_lamp_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.22,
+    0.22,
+    0.802
+   ],
+   "bounds_min_m": [
+    -0.11,
+    -0.11,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.11,
+    0.11,
+    0.802
+   ],
+   "tris": 7208,
+   "mesh_objects": 3,
+   "materials": [
+    "vintage_oil_lamp",
+    "vintage_oil_lamp_flame",
+    "vintage_oil_lamp_glass"
+   ],
+   "facing": "symmetric",
+   "notes": "Vintage oil lamp.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\vintage_oil_lamp.png"
+  },
+  {
+   "id": "hanging_industrial_lamp",
+   "gltf": "SourceAssets/PolyHaven/hanging_industrial_lamp/hanging_industrial_lamp_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.55,
+    0.55,
+    1.355
+   ],
+   "bounds_min_m": [
+    -0.275,
+    -0.275,
+    -1.34
+   ],
+   "bounds_max_m": [
+    0.275,
+    0.275,
+    0.015
+   ],
+   "tris": 9530,
+   "mesh_objects": 1,
+   "materials": [
+    "hanging_industrial_lamp",
+    "hanging_industrial_lamp_glass"
+   ],
+   "facing": "symmetric (hangs from origin)",
+   "notes": "Hanging industrial pendant lamp; origin at the ceiling (geometry below z=0).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\hanging_industrial_lamp.png"
+  },
+  {
+   "id": "round_wooden_table_01",
+   "gltf": "SourceAssets/PolyHaven/round_wooden_table_01/round_wooden_table_01_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    1.399,
+    1.399,
+    1.005
+   ],
+   "bounds_min_m": [
+    -0.7,
+    -0.7,
+    -0.001
+   ],
+   "bounds_max_m": [
+    0.7,
+    0.7,
+    1.004
+   ],
+   "tris": 8640,
+   "mesh_objects": 2,
+   "materials": [
+    "round_wooden_table_01"
+   ],
+   "facing": "symmetric",
+   "notes": "Dark mahogany pedestal table: 1.4 m round top, turned column, 3 cabriole legs, 1.0 m tall; polished/good condition. Fits the Number Game room as a period table (a bit tall - scale Z ~0.75 for dining height).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\round_wooden_table_01.png"
+  },
+  {
+   "id": "round_wooden_table_02",
+   "gltf": "SourceAssets/PolyHaven/round_wooden_table_02/round_wooden_table_02_2k.gltf",
+   "resolution": "2k",
+   "size_m": [
+    0.796,
+    0.796,
+    0.746
+   ],
+   "bounds_min_m": [
+    -0.398,
+    -0.398,
+    -0.0
+   ],
+   "bounds_max_m": [
+    0.398,
+    0.398,
+    0.746
+   ],
+   "tris": 4254,
+   "mesh_objects": 1,
+   "materials": [
+    "round_wooden_table_02"
+   ],
+   "facing": "symmetric",
+   "notes": "Small 0.8 m round top on a dark square panelled cabinet with thin iron legs (side/bedside table). Too small for the main game table; use as side furniture.",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\round_wooden_table_02.png"
+  },
+  {
+   "id": "chess_set",
+   "gltf": "SourceAssets/PolyHaven/chess_set/chess_set_1k.gltf",
+   "resolution": "1k",
+   "size_m": [
+    0.553,
+    0.553,
+    0.112
+   ],
+   "bounds_min_m": [
+    -0.277,
+    -0.277,
+    0.0
+   ],
+   "bounds_max_m": [
+    0.277,
+    0.277,
+    0.112
+   ],
+   "tris": 76920,
+   "mesh_objects": 33,
+   "materials": [
+    "chess_set_board",
+    "chess_set_pieces_black",
+    "chess_set_pieces_white"
+   ],
+   "facing": "board axis-aligned",
+   "notes": "Chess board + 32 pieces (33 meshes).",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews\\chess_set.png"
+  }
+ ],
+ "polyhaven_missing_ids": [],
+ "textures": [
+  {
+   "role": "floor_checkered_marble",
+   "description": "old checkered marble floor (dirty) - hotel lobby",
+   "id": "floor_tiles_06",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/floor_tiles_06/floor_tiles_06_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/floor_tiles_06/floor_tiles_06_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/floor_tiles_06/floor_tiles_06_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "wall_wallpaper_decayed",
+   "description": "decrepit peeling wallpaper - hotel walls",
+   "id": "decrepit_wallpaper",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/decrepit_wallpaper/decrepit_wallpaper_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/decrepit_wallpaper/decrepit_wallpaper_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/decrepit_wallpaper/decrepit_wallpaper_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "wall_peeling_paint_alt",
+   "description": "alternative: cracked/peeling painted plaster wall",
+   "id": "peeling_painted_wall",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/peeling_painted_wall/peeling_painted_wall_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/peeling_painted_wall/peeling_painted_wall_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/peeling_painted_wall/peeling_painted_wall_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "wood_dark_planks",
+   "description": "dark worn wooden planks",
+   "id": "dark_wooden_planks",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/dark_wooden_planks/dark_wooden_planks_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/dark_wooden_planks/dark_wooden_planks_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/dark_wooden_planks/dark_wooden_planks_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "wood_dark_panels_alt",
+   "description": "alternative: dark lacquered wood panelling (wainscot/doors)",
+   "id": "dark_paneled_wood",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/dark_paneled_wood/dark_paneled_wood_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/dark_paneled_wood/dark_paneled_wood_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/dark_paneled_wood/dark_paneled_wood_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "metal_rust",
+   "description": "rusty corroded metal sheet",
+   "id": "rusty_metal_04",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/rusty_metal_04/rusty_metal_04_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/rusty_metal_04/rusty_metal_04_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/rusty_metal_04/rusty_metal_04_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "concrete_wet_dark",
+   "description": "dark (wet-looking) hangar concrete floor - lower roughness in material for wetness",
+   "id": "hangar_concrete_floor",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/hangar_concrete_floor/hangar_concrete_floor_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/hangar_concrete_floor/hangar_concrete_floor_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/hangar_concrete_floor/hangar_concrete_floor_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "stone_temple_blocks",
+   "description": "ancient large stone block wall (castle/temple)",
+   "id": "stone_block_wall",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/stone_block_wall/stone_block_wall_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/stone_block_wall/stone_block_wall_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/stone_block_wall/stone_block_wall_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "rock_dark_cliff",
+   "description": "rough dark rock / cliff",
+   "id": "dark_rock",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/dark_rock/dark_rock_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/dark_rock/dark_rock_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/dark_rock/dark_rock_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "fabric_velvet",
+   "description": "red velvet (tint for sofas/curtains/green table felt)",
+   "id": "velour_velvet",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/velour_velvet/velour_velvet_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/velour_velvet/velour_velvet_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/velour_velvet/velour_velvet_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  },
+  {
+   "role": "sand_wet_beach",
+   "description": "damp dark beach sand",
+   "id": "damp_beach_sand_02",
+   "resolution": "2k",
+   "format": "jpg",
+   "files": {
+    "diff": "SourceAssets/Textures/PolyHaven/damp_beach_sand_02/damp_beach_sand_02_diff_2k.jpg",
+    "nor_gl": "SourceAssets/Textures/PolyHaven/damp_beach_sand_02/damp_beach_sand_02_nor_gl_2k.jpg",
+    "arm": "SourceAssets/Textures/PolyHaven/damp_beach_sand_02/damp_beach_sand_02_arm_2k.jpg"
+   },
+   "notes": "nor_gl = OpenGL normal (Unreal: enable Flip Green Channel); arm = R:AO G:Roughness B:Metallic"
+  }
+ ],
+ "custom_models": [
+  {
+   "name": "SM_Suit_Heart",
+   "path": "SourceAssets/Models/SM_Suit_Heart.glb",
+   "size_m": [
+    1.0228,
+    0.18,
+    1.0
+   ],
+   "tris": 4084,
+   "material_slots": [
+    "Suit"
+   ],
+   "facing": "-Y (front face visible from -Y), symbol stands upright along +Z",
+   "origin": "centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Suit_Heart.png"
+  },
+  {
+   "name": "SM_Suit_Diamond",
+   "path": "SourceAssets/Models/SM_Suit_Diamond.glb",
+   "size_m": [
+    0.7422,
+    0.18,
+    1.0
+   ],
+   "tris": 1452,
+   "material_slots": [
+    "Suit"
+   ],
+   "facing": "-Y (front face visible from -Y), symbol stands upright along +Z",
+   "origin": "centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Suit_Diamond.png"
+  },
+  {
+   "name": "SM_Suit_Club",
+   "path": "SourceAssets/Models/SM_Suit_Club.glb",
+   "size_m": [
+    0.7947,
+    0.18,
+    1.0
+   ],
+   "tris": 5960,
+   "material_slots": [
+    "Suit"
+   ],
+   "facing": "-Y (front face visible from -Y), symbol stands upright along +Z",
+   "origin": "centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Suit_Club.png"
+  },
+  {
+   "name": "SM_Suit_Spade",
+   "path": "SourceAssets/Models/SM_Suit_Spade.glb",
+   "size_m": [
+    0.7492,
+    0.18,
+    1.0
+   ],
+   "tris": 4252,
+   "material_slots": [
+    "Suit"
+   ],
+   "facing": "-Y (front face visible from -Y), symbol stands upright along +Z",
+   "origin": "centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Suit_Spade.png"
+  },
+  {
+   "name": "SM_Throne",
+   "path": "SourceAssets/Models/SM_Throne.glb",
+   "size_m": [
+    1.5,
+    1.3,
+    2.4
+   ],
+   "tris": 4364,
+   "material_slots": [
+    "Stone",
+    "Inlay"
+   ],
+   "facing": "-Y (seat opens toward -Y)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "seat top 0.55 m; pointed-arch back with recessed panel, inlaid diamond emblem + diamond finial (Inlay = metal trim)",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Throne.png"
+  },
+  {
+   "name": "SM_Altar",
+   "path": "SourceAssets/Models/SM_Altar.glb",
+   "size_m": [
+    10.0,
+    10.0,
+    0.9
+   ],
+   "tris": 10944,
+   "material_slots": [
+    "Stone",
+    "Glow"
+   ],
+   "facing": "radially symmetric (no facing)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "3 steps (r 5.0/4.2/3.4 m, 0.3 m risers); emissive groove ring r 2.60-2.72 m, 25 mm deep",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Altar.png"
+  },
+  {
+   "name": "SM_SwitchPedestal",
+   "path": "SourceAssets/Models/SM_SwitchPedestal.glb",
+   "size_m": [
+    0.62,
+    0.62,
+    1.3043
+   ],
+   "tris": 2028,
+   "material_slots": [
+    "Stone",
+    "Metal",
+    "Glow"
+   ],
+   "facing": "-Y (slanted plate + rune grooves face -Y)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "button disc 0.2 m dia on a 21.8 deg slanted plate; glowing rune grooves on front face + 12 notches around the disc",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_SwitchPedestal.png"
+  },
+  {
+   "name": "SM_Podium",
+   "path": "SourceAssets/Models/SM_Podium.glb",
+   "size_m": [
+    0.8935,
+    0.7775,
+    1.0593
+   ],
+   "tris": 568,
+   "material_slots": [
+    "Metal",
+    "Screen",
+    "Trim"
+   ],
+   "facing": "-Y (top panel slopes down toward -Y, flat hex side faces -Y)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "Screen = inset slanted top panel (16 deg); Trim = rim strip around the top + two hex bands (base, under head)",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_Podium.png"
+  },
+  {
+   "name": "SM_RoundTable_Big",
+   "path": "SourceAssets/Models/SM_RoundTable_Big.glb",
+   "size_m": [
+    4.2,
+    4.2,
+    0.95
+   ],
+   "tris": 17408,
+   "material_slots": [
+    "Top",
+    "Base",
+    "Glow"
+   ],
+   "facing": "radially symmetric (no facing)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "top 4.2 m dia, 0.12 m thick (0.83-0.95 m); centre hole 1.2 m dia (open into hollow drum base, floor at 0.05 m for a projector); glow channels at r 1.86-1.94 and r 0.66-0.70",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_RoundTable_Big.png"
+  },
+  {
+   "name": "SM_HoloRing",
+   "path": "SourceAssets/Models/SM_HoloRing.glb",
+   "size_m": [
+    2.04,
+    2.04,
+    0.04
+   ],
+   "tris": 3072,
+   "material_slots": [
+    "Glow"
+   ],
+   "facing": "flat ring in the XY plane (axis = +Z / Unreal Z)",
+   "origin": "centre",
+   "uv": "U around the ring (0..1), V around the tube",
+   "notes": "",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_HoloRing.png"
+  },
+  {
+   "name": "SM_BeamCylinder",
+   "path": "SourceAssets/Models/SM_BeamCylinder.glb",
+   "size_m": [
+    2.0,
+    2.0,
+    1.0
+   ],
+   "tris": 512,
+   "material_slots": [
+    "Beam"
+   ],
+   "facing": "axis +Z, open ends, normals outward",
+   "origin": "bottom centre",
+   "uv": "U wraps 0..1 around (seam at +X), V = 0 at bottom .. 1 at top as seen in Unreal (glTF/UE top-left UV origin)",
+   "notes": "",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_BeamCylinder.png"
+  },
+  {
+   "name": "SM_ColumnRuined",
+   "path": "SourceAssets/Models/SM_ColumnRuined.glb",
+   "size_m": [
+    1.07,
+    1.07,
+    6.0
+   ],
+   "tris": 13986,
+   "material_slots": [
+    "Plaster",
+    "Trim"
+   ],
+   "facing": "mostly symmetric; biggest broken corner of the capital at -Y/+X",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "20-flute shaft with entasis, Attic-style base + Doric-style capital, chipped top/plinth (broken faces use Plaster)",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_ColumnRuined.png"
+  },
+  {
+   "name": "SM_ReceptionDesk",
+   "path": "SourceAssets/Models/SM_ReceptionDesk.glb",
+   "size_m": [
+    4.0696,
+    1.2664,
+    1.14
+   ],
+   "tris": 7708,
+   "material_slots": [
+    "Wood",
+    "Marble",
+    "Metal"
+   ],
+   "facing": "-Y (convex customer side faces -Y; clerk side/work surface on +Y)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "arc radius 4.6 m, chord 4.0 m; marble counter 1.1 m + marble work surface 0.78 m on the clerk side; reeded wood front with brass pilasters/bands",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_ReceptionDesk.png"
+  },
+  {
+   "name": "SM_GuardianStatue",
+   "path": "SourceAssets/Models/SM_GuardianStatue.glb",
+   "size_m": [
+    4.6455,
+    4.6455,
+    8.0
+   ],
+   "tris": 97222,
+   "material_slots": [
+    "Stone",
+    "Eyes"
+   ],
+   "facing": "-Y (face, hands and sword toward -Y)",
+   "origin": "bottom centre",
+   "uv": "smart-projected, world scale: 1 UV unit = 1 m (tiling textures repeat once per metre)",
+   "notes": "procedural hooded robed colossus on an octagonal 2-step base, greatsword point-down held in both hands; Eyes = two slanted slits inside the hood",
+   "preview_png": "C:\\Users\\nikku\\AppData\\Local\\Temp\\claude\\C--Users-nikku-Documents-Unreal-Projects-AliceInBotherland\\cc56d96c-7f2b-427c-b356-caf8bf313326\\scratchpad\\art_work\\previews_custom\\SM_GuardianStatue.png"
+  }
+ ],
+ "fonts": [
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/BebasNeue-Regular.ttf",
+   "font": "Bebas Neue Regular",
+   "family_name": "Bebas Neue",
+   "weight_class": 400,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_BebasNeue.txt",
+   "source": "github.com/google/fonts ofl/bebasneue"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/BarlowCondensed-SemiBold.ttf",
+   "font": "Barlow Condensed SemiBold",
+   "family_name": "Barlow Condensed SemiBold",
+   "weight_class": 600,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_BarlowCondensed.txt",
+   "source": "github.com/google/fonts ofl/barlowcondensed"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/BarlowCondensed-Bold.ttf",
+   "font": "Barlow Condensed Bold",
+   "family_name": "Barlow Condensed",
+   "weight_class": 700,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_BarlowCondensed.txt",
+   "source": "github.com/google/fonts ofl/barlowcondensed"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/Barlow-Regular.ttf",
+   "font": "Barlow Regular",
+   "family_name": "Barlow",
+   "weight_class": 400,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_Barlow.txt",
+   "source": "github.com/google/fonts ofl/barlow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/Barlow-Medium.ttf",
+   "font": "Barlow Medium",
+   "family_name": "Barlow Medium",
+   "weight_class": 500,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_Barlow.txt",
+   "source": "github.com/google/fonts ofl/barlow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/Cinzel-Regular.ttf",
+   "font": "Cinzel Regular (static instance wght=400 of Cinzel[wght].ttf via fontTools instancer)",
+   "family_name": "Cinzel",
+   "weight_class": 400,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_Cinzel.txt",
+   "source": "github.com/google/fonts ofl/cinzel"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/Cinzel-Bold.ttf",
+   "font": "Cinzel Bold (static instance wght=700)",
+   "family_name": "Cinzel",
+   "weight_class": 700,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_Cinzel.txt",
+   "source": "github.com/google/fonts ofl/cinzel"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Fonts/Symbols.ttf",
+   "font": "Noto Sans Symbols 2 Regular (renamed) - has U+2660 spade, U+2663 club, U+2665 heart, U+2666 diamond (+ outline variants)",
+   "family_name": "Noto Sans Symbols 2",
+   "weight_class": 400,
+   "variable": false,
+   "license": "OFL-1.1",
+   "license_file": "Content/AliceInBotherland/UI/Fonts/OFL_NotoSansSymbols2.txt",
+   "source": "github.com/google/fonts ofl/notosanssymbols2"
+  }
+ ],
+ "ui_images": [
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Crest_0.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "The Tidewardens - great wave (Material Icons \"tsunami\")"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Crest_1.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "The Ember Clan - flame (Material Icons \"local_fire_department\")"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Crest_2.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "The Salt Choir - bell (Material Icons \"notifications\")"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Crest_3.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "The Iron Drift - anchor (Material Icons \"anchor\")"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Crest_4.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "The Greenhollow - sprouting leaf (Material Icons \"eco\")"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Glow_Soft.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "white radial soft blob (fades to 0 at the edge)"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/GradientUp.png",
+   "size": [
+    8,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "white, alpha 0 at top -> 1 at bottom"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Grain.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "tileable film grain, grey noise, alpha ~0.11"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Logo_Emblem.png",
+   "size": [
+    1024,
+    1024
+   ],
+   "mode": "RGBA",
+   "description": "game emblem: spade/heart/club/diamond in a diamond frame around a crown over an island with waves; white with soft glow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Ring.png",
+   "size": [
+    512,
+    512
+   ],
+   "mode": "RGBA",
+   "description": "thin white ring r=200 px with soft glow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Club.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "white club glyph"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Club_Glow.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "club + soft outer glow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Diamond.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "white diamond glyph"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Diamond_Glow.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "diamond + soft outer glow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Heart.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "white heart glyph ~200 px tall (tint in UI)"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Heart_Glow.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "heart (176 px) + soft outer glow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Spade.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "white spade glyph"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Suit_Spade_Glow.png",
+   "size": [
+    256,
+    256
+   ],
+   "mode": "RGBA",
+   "description": "spade + soft outer glow"
+  },
+  {
+   "file": "Content/AliceInBotherland/UI/Images/Vignette.png",
+   "size": [
+    1024,
+    1024
+   ],
+   "mode": "RGBA",
+   "description": "black, alpha 0 centre -> 0.85 corners (smoothstep radial)"
+  }
+ ],
+ "guardian_recommendation": "SM_GuardianStatue (custom hooded robed colossus, greatsword point-down, glowing eye slits, 8 m) matches the brief; gothic_statue (crowned veiled queen with book & chains, photoscan) is the best Poly Haven full-body alternative - scale ~4.6x.",
+ "tools": "Blender 5.2.3 headless (scripts in the scratch dir), Pillow/numpy, fontTools, shapely"
+}
