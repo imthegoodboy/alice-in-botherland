@@ -734,6 +734,11 @@ TSharedRef<SWidget> SAIBHud::MakeChat()
 			{
 				return EVisibility::Visible;
 			}
+			// Never an empty box over the scene (e.g. the lobby notices are cleared when the story starts).
+			if (!ChatList.IsValid() || ChatList->NumSlots() == 0)
+			{
+				return EVisibility::Collapsed;
+			}
 			return (bAlways || bRecent) ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed;
 		})
 		[
