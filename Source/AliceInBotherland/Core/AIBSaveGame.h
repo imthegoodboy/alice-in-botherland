@@ -20,6 +20,12 @@ struct FAIBSettings
 	UPROPERTY() float MouseSensitivity = 1.0f;
 	UPROPERTY() bool bInvertY = false;
 	UPROPERTY() bool bSubtitles = true;
+	/** Caption text size multiplier (0.8 - 1.5). */
+	UPROPERTY() float SubtitleScale = 1.f;
+	/** Third-person camera field of view in degrees. */
+	UPROPERTY() float FieldOfView = 80.f;
+	/** Voice chat: 0 = microphone off, 1 = push to talk (V), 2 = open microphone. */
+	UPROPERTY() int32 MicMode = 1;
 	/** 0 Low .. 3 Epic, -1 = auto (benchmark). */
 	UPROPERTY() int32 Quality = -1;
 	UPROPERTY() bool bFullscreen = true;
@@ -35,6 +41,26 @@ class ALICEINBOTHERLAND_API UAIBSaveGame : public USaveGame
 public:
 	UPROPERTY() FAIBSettings Settings;
 	UPROPERTY() bool bSeenPrologue = false;
+	/** First-launch profile (champion name + date of birth) has been filled in. */
+	UPROPERTY() bool bProfileComplete = false;
+	UPROPERTY() int32 BirthYear = 0;
+	UPROPERTY() int32 BirthMonth = 0;
+	UPROPERTY() int32 BirthDay = 0;
+	/** Age in whole years from the stored date of birth (-1 if unknown). */
+	int32 GetAge() const
+	{
+		if (BirthYear <= 0 || BirthMonth <= 0 || BirthDay <= 0)
+		{
+			return -1;
+		}
+		const FDateTime Now = FDateTime::Now();
+		int32 Age = Now.GetYear() - BirthYear;
+		if (Now.GetMonth() < BirthMonth || (Now.GetMonth() == BirthMonth && Now.GetDay() < BirthDay))
+		{
+			--Age;
+		}
+		return Age;
+	}
 	UPROPERTY() bool bBenchmarked = false;
 	/** Version of the automatic graphics defaults this profile was set up with (re-detected when it changes). */
 	UPROPERTY() int32 GraphicsDefaultsVersion = 0;

@@ -14,6 +14,7 @@ class AAIBNumberArena;
 class AAIBHotelArena;
 class AAIBRaceCourse;
 class AAIBGuardianSite;
+class AAIBLoreStones;
 class AAIBEnvironmentDirector;
 class AAIBLandingSite;
 
@@ -39,6 +40,7 @@ public:
 	AAIBHotelArena* GetHotel() const { return Hotel.Get(); }
 	AAIBRaceCourse* GetRaceCourse() const { return RaceCourse.Get(); }
 	AAIBGuardianSite* GetGuardian() const { return Guardian.Get(); }
+	AAIBLoreStones* GetLoreStones() const { return LoreStones.Get(); }
 	AAIBEnvironmentDirector* GetEnvironment() const { return Environment.Get(); }
 
 	bool IsIslandMap() const;
@@ -54,6 +56,7 @@ private:
 	TWeakObjectPtr<AAIBHotelArena> Hotel;
 	TWeakObjectPtr<AAIBRaceCourse> RaceCourse;
 	TWeakObjectPtr<AAIBGuardianSite> Guardian;
+	TWeakObjectPtr<AAIBLoreStones> LoreStones;
 	TWeakObjectPtr<AAIBEnvironmentDirector> Environment;
 
 	EAIBSceneZone LocalZone = EAIBSceneZone::Lobby;

@@ -13,6 +13,8 @@ void AAIBPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AAIBPlayerState, Slot);
+	DOREPLIFETIME(AAIBPlayerState, bTalking);
+	DOREPLIFETIME(AAIBPlayerState, LoreFound);
 	DOREPLIFETIME(AAIBPlayerState, bBot);
 	DOREPLIFETIME(AAIBPlayerState, bHost);
 	DOREPLIFETIME(AAIBPlayerState, bReady);
@@ -102,6 +104,7 @@ void AAIBPlayerState::ResetForNewMatch()
 	FinalChoice = EAIBFinalChoice::None;
 	RaceTime = -1.f;
 	bWantsSkipCinematic = false;
+	LoreFound = 0;
 	HiddenSymbol = EAIBSymbol::None;
 	PendingNumber = INDEX_NONE;
 	PendingGuess = EAIBSymbol::None;

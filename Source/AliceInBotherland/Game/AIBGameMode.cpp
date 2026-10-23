@@ -1,6 +1,9 @@
 // Alice in Botherland - server authority: core, lobby, seating, phase machine
 
 #include "Game/AIBGameMode.h"
+#include "Audio/AIBNarration.h"
+#include "Online/AIBRoomCode.h"
+#include "Online/AIBSessionSubsystem.h"
 #include "Game/AIBGameState.h"
 #include "Game/AIBPlayerState.h"
 #include "Game/AIBBotController.h"
@@ -88,9 +91,32 @@ FString AAIBGameMode::InitNewPlayer(APlayerController* NewPlayerController, cons
 	return Error;
 }
 
+void AAIBGameMode::UpdateRoomCodes()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	UAIBSessionSubsystem* Sessions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAIBSessionSubsystem>() : nullptr;
+	if (!GS || !Sessions || GetNetMode() == NM_Standalone)
+	{
+		return;
+	}
+	const int32 Port = GetWorld()->URL.Port > 0 ? GetWorld()->URL.Port : AIBRoomCode::DefaultPort;
+	GS->RoomCode = AIBRoomCode::FromAddress(Sessions->GetLocalAddress(), Port);
+	UE_LOG(LogAIB, Log, TEXT("Room code %s (%s)"), *GS->RoomCode, *Sessions->GetLocalAddress());
+	TWeakObjectPtr<AAIBGameState> WeakGS = GS;
+	AIBRoomCode::FetchPublicAddress([WeakGS, Port](const FString& Public)
+	{
+		if (WeakGS.IsValid() && !Public.IsEmpty())
+		{
+			WeakGS->RoomCodeInternet = AIBRoomCode::FromAddress(Public, Port);
+			UE_LOG(LogAIB, Log, TEXT("Internet room code %s"), *WeakGS->RoomCodeInternet);
+		}
+	});
+}
+
 void AAIBGameMode::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
+	UpdateRoomCodes();
 	if (AAIBGameState* GS = GetAIBGameState())
 	{
 		GS->MatchSeed = Random.RandRange(1, 1 << 30);
@@ -153,6 +179,18 @@ void AAIBGameMode::PostLogin(APlayerController* NewPlayer)
 	if (!GS->bMatchInProgress)
 	{
 		PS->Slot = INDEX_NONE;
+		if (FindFreeSlot() == INDEX_NONE)
+		{
+			// A full lobby makes room for a person by sending one AI champion home.
+			for (AAIBPlayerState* Seated : GS->GetSeatedPlayers())
+			{
+				if (Seated->bBot && !Seated->bDisconnected)
+				{
+					RemoveBot(Cast<AAIBBotController>(Seated->GetOwner()));
+					break;
+				}
+			}
+		}
 		if (!SeatPlayer(PS))
 		{
 			UE_LOG(LogAIB, Warning, TEXT("No seat for %s, spectating."), *PS->GetPlayerName());
@@ -426,11 +464,81 @@ void AAIBGameMode::RequestRemoveSeat(AAIBPlayerController* PC, int32 Slot)
 	}
 }
 
+void AAIBGameMode::RequestStart(AAIBPlayerController* PC)
+{
+	AAIBPlayerState* PS = PC ? PC->GetPlayerState<AAIBPlayerState>() : nullptr;
+	AAIBGameState* GS = GetAIBGameState();
+	if (!PS || !PS->bHost || GS->Phase != EAIBPhase::Lobby)
+	{
+		return;
+	}
+	PS->bReady = true;
+	if (LobbyIsReady())
+	{
+		StartCountdown();
+	}
+	else
+	{
+		PC->ClientNotify(LOCTEXT("NotReady", "Every seat must be filled and every champion ready."), TEXT("SFX_Wrong"));
+	}
+}
+
+void AAIBGameMode::RequestSetAITestMode(AAIBPlayerController* PC, bool bOn)
+{
+	const AAIBPlayerState* PS = PC ? PC->GetPlayerState<AAIBPlayerState>() : nullptr;
+	AAIBGameState* GS = GetAIBGameState();
+	if (!PS || !PS->bHost || GS->bMatchInProgress || GS->bAITestMode == bOn)
+	{
+		return;
+	}
+	GS->bAITestMode = bOn;
+	if (bOn)
+	{
+		RequestFillBots(PC);
+	}
+	else
+	{
+		for (AAIBPlayerState* Seated : GS->GetSeatedPlayers())
+		{
+			if (Seated->bBot && !Seated->bDisconnected)
+			{
+				RemoveBot(Cast<AAIBBotController>(Seated->GetOwner()));
+			}
+		}
+		if (GS->Phase == EAIBPhase::LobbyCountdown)
+		{
+			EnterPhase(EAIBPhase::Lobby);
+		}
+	}
+	Cue(TEXT("SFX_UI_Click"));
+}
+
+void AAIBGameMode::DiscoverLore(AController* Controller, int32 Index)
+{
+	AAIBPlayerState* PS = Controller ? Controller->GetPlayerState<AAIBPlayerState>() : nullptr;
+	if (!PS || Index < 0 || Index >= 5 || GetAIBGameState()->Phase != EAIBPhase::IslandExplore || (PS->LoreFound & (1 << Index)))
+	{
+		return;
+	}
+	PS->LoreFound |= 1 << Index;
+	PS->ForceNetUpdate();
+}
+
+void AAIBGameMode::SetTalking(AController* Controller, bool bTalking)
+{
+	AAIBPlayerState* PS = Controller ? Controller->GetPlayerState<AAIBPlayerState>() : nullptr;
+	if (PS && PS->bTalking != bTalking)
+	{
+		PS->bTalking = bTalking;
+		PS->ForceNetUpdate();
+	}
+}
+
 void AAIBGameMode::RequestSkipCinematic(AAIBPlayerController* PC)
 {
 	AAIBGameState* GS = GetAIBGameState();
 	AAIBPlayerState* PS = PC ? PC->GetPlayerState<AAIBPlayerState>() : nullptr;
-	if (!PS || GS->Phase != EAIBPhase::ArrivalCinematic)
+	if (!PS || (GS->Phase != EAIBPhase::ArrivalCinematic && GS->Phase != EAIBPhase::StoryIntro))
 	{
 		return;
 	}
@@ -484,19 +592,21 @@ void AAIBGameMode::TickLobby()
 			PS->bReady = true;
 		}
 	}
-	if (bAutoStart && GS->Phase == EAIBPhase::Lobby)
+	if ((bAutoStart || GS->bAITestMode) && GS->Phase == EAIBPhase::Lobby)
 	{
 		for (int32 Slot = FindFreeSlot(); Slot != INDEX_NONE; Slot = FindFreeSlot())
 		{
-			SpawnBot(Slot, FString(), false);
+			if (!SpawnBot(Slot, FString(), false))
+			{
+				break;
+			}
 		}
 	}
 
-	if (GS->Phase == EAIBPhase::Lobby && LobbyIsReady())
+	// The host presses START; the test URL options start on their own.
+	if (GS->Phase == EAIBPhase::Lobby && (bAutoStart || bAutoReady) && LobbyIsReady())
 	{
-		// No banner: the lobby panel shows the big countdown itself.
-		EnterPhase(EAIBPhase::LobbyCountdown);
-		Cue(TEXT("SFX_Ready"));
+		StartCountdown();
 	}
 	else if (GS->Phase == EAIBPhase::LobbyCountdown && !LobbyIsReady())
 	{
@@ -504,6 +614,13 @@ void AAIBGameMode::TickLobby()
 		Announce(LOCTEXT("Cancelled", "COUNTDOWN CANCELLED"), LOCTEXT("CancelledSub", "A champion is no longer ready"), FLinearColor(1.f, 0.3f, 0.3f));
 		Cue(TEXT("SFX_Wrong"));
 	}
+}
+
+void AAIBGameMode::StartCountdown()
+{
+	// No banner: the lobby panel shows the big countdown itself.
+	EnterPhase(EAIBPhase::LobbyCountdown);
+	Cue(TEXT("SFX_Ready"));
 }
 
 void AAIBGameMode::BeginMatch()
@@ -566,7 +683,7 @@ void AAIBGameMode::BeginMatch()
 		return;
 	}
 #endif
-	EnterPhase(EAIBPhase::ArrivalCinematic);
+	EnterPhase(EAIBPhase::StoryIntro);
 }
 
 void AAIBGameMode::ResetToLobby()
@@ -646,24 +763,25 @@ float AAIBGameMode::DefaultDuration(EAIBPhase Phase) const
 	switch (Phase)
 	{
 	case EAIBPhase::LobbyCountdown: return AIB::LobbyCountdown;
+	case EAIBPhase::StoryIntro: return AIBNarration::Length(EAIBNarration::Story);
 	case EAIBPhase::ArrivalCinematic: return AIB::ArrivalCinematic;
 	case EAIBPhase::IslandExplore: return AIB::IslandExplore;
-	case EAIBPhase::Stage1Briefing: return AIB::Stage1Briefing;
+	case EAIBPhase::Stage1Briefing: return AIBNarration::Length(EAIBNarration::Stage1);
 	case EAIBPhase::Stage1RoundIntro: return AIB::Stage1RoundIntro;
 	case EAIBPhase::Stage1Selection: return AIB::Stage1Selection;
 	case EAIBPhase::Stage1Reveal: return AIB::Stage1Reveal;
 	case EAIBPhase::Stage1Results: return AIB::Stage1Results;
 	case EAIBPhase::Stage1Elimination: return AIB::StageElimination;
-	case EAIBPhase::Stage2Briefing: return AIB::Stage2Briefing;
+	case EAIBPhase::Stage2Briefing: return AIBNarration::Length(EAIBNarration::Stage2);
 	case EAIBPhase::Stage2Communication: return AIB::Stage2Communication;
 	case EAIBPhase::Stage2Guess: return AIB::Stage2Guess;
 	case EAIBPhase::Stage2Results: return AIB::Stage2Results;
 	case EAIBPhase::Stage2Elimination: return AIB::StageElimination;
-	case EAIBPhase::Stage3Briefing: return AIB::Stage3Briefing;
+	case EAIBPhase::Stage3Briefing: return AIBNarration::Length(EAIBNarration::Stage3);
 	case EAIBPhase::Stage3Countdown: return AIB::Stage3Countdown;
 	case EAIBPhase::Stage3Race: return AIB::Stage3Race;
 	case EAIBPhase::Stage3Finish: return AIB::Stage3Finish;
-	case EAIBPhase::FinalBriefing: return AIB::FinalBriefing;
+	case EAIBPhase::FinalBriefing: return AIBNarration::Length(EAIBNarration::Final);
 	case EAIBPhase::FinalChoice: return AIB::FinalSelect;
 	case EAIBPhase::FinalResolve: return AIB::FinalResolve;
 	case EAIBPhase::EndingCinematic: return AIB::EndingCinematic;
@@ -685,8 +803,14 @@ void AAIBGameMode::EnterPhase(EAIBPhase Phase, float DurationOverride)
 	case EAIBPhase::Lobby:
 		Cue(TEXT("MUS_Lobby"));
 		break;
-	case EAIBPhase::ArrivalCinematic:
+	case EAIBPhase::StoryIntro:
 		Cue(TEXT("MUS_Arrival"));
+		for (AAIBPlayerState* PS : GS->GetSeatedPlayers())
+		{
+			PS->bWantsSkipCinematic = false;
+		}
+		break;
+	case EAIBPhase::ArrivalCinematic:
 		Cue(TEXT("SFX_ShipHorn"));
 		for (AAIBPlayerState* PS : GS->GetSeatedPlayers())
 		{
@@ -696,7 +820,6 @@ void AAIBGameMode::EnterPhase(EAIBPhase Phase, float DurationOverride)
 	case EAIBPhase::IslandExplore:
 	{
 		SpawnChampionsAtLanding();
-		Cue(TEXT("VO_Explore"));
 		Cue(TEXT("MUS_Explore"));
 		Announce(LOCTEXT("ExploreTitle", "THE LAST ISLAND"), LOCTEXT("ExploreSub", "Explore. The first trial begins soon."), FLinearColor(0.6f, 1.f, 0.5f));
 		// Bots stroll around the landing area.
@@ -773,6 +896,9 @@ void AAIBGameMode::OnPhaseTimerExpired()
 	{
 	case EAIBPhase::LobbyCountdown:
 		BeginMatch();
+		break;
+	case EAIBPhase::StoryIntro:
+		FadeToPhase(EAIBPhase::ArrivalCinematic);
 		break;
 	case EAIBPhase::ArrivalCinematic:
 		EnterPhase(EAIBPhase::IslandExplore);

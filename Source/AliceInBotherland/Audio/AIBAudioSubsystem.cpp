@@ -1,6 +1,7 @@
 // Alice in Botherland - music, voice, ambience and one-shot sounds by cue id
 
 #include "Audio/AIBAudioSubsystem.h"
+#include "Audio/AIBNarration.h"
 #include "Core/AIBAssets.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -60,6 +61,10 @@ FText UAIBAudioSubsystem::VoiceLineText(FName LineId)
 		Lines.Add(TEXT("VO_End_SoloSacrifice"), LOCTEXT("ES", "The last champion gave their life for their people. The island remains unclaimed, and the Guardian sleeps once more."));
 		Lines.Add(TEXT("VO_Lobby_Ready"), LOCTEXT("LR", "Five champions. The trials begin."));
 	}
+	if (const AIBNarration::FLine* Line = AIBNarration::FindLine(LineId))
+	{
+		return Line->Text;
+	}
 	const FText* Found = Lines.Find(LineId);
 	return Found ? *Found : FText::GetEmpty();
 }
@@ -77,6 +82,10 @@ FText UAIBAudioSubsystem::GetSubtitle() const
 FText UAIBAudioSubsystem::GetSubtitleSpeaker() const
 {
 	const FString Id = SubtitleLine.ToString();
+	if (AIBNarration::IsNarratorLine(SubtitleLine))
+	{
+		return LOCTEXT("Alice", "ALICE");
+	}
 	const bool bNarrator = Id.StartsWith(TEXT("VO_Prologue")) || Id.StartsWith(TEXT("VO_End")) || Id == TEXT("VO_Arrival");
 	return bNarrator ? LOCTEXT("Narrator", "NARRATOR") : LOCTEXT("Guardian", "THE GUARDIAN");
 }
@@ -113,7 +122,7 @@ UAudioComponent* UAIBAudioSubsystem::MakeComponent(USoundBase* Sound, float Volu
 void UAIBAudioSubsystem::PlayCue(FName CueId)
 {
 	const FString Id = CueId.ToString();
-	if (Id.StartsWith(TEXT("VO_")))
+	if (Id.StartsWith(TEXT("VO_")) || Id.StartsWith(TEXT("NAR_")))
 	{
 		PlayVoice(CueId);
 	}
@@ -205,6 +214,24 @@ void UAIBAudioSubsystem::PlayVoice(FName LineId)
 	}
 }
 
+void UAIBAudioSubsystem::StopNarration()
+{
+	if (AIBNarration::IsNarratorLine(SubtitleLine))
+	{
+		if (IsValid(Voice))
+		{
+			Voice->FadeOut(0.4f, 0.f);
+		}
+		SubtitleLine = NAME_None;
+	}
+}
+
+FName UAIBAudioSubsystem::GetSubtitleLine() const
+{
+	const UWorld* World = GetAudioWorld();
+	return World && World->GetRealTimeSeconds() <= SubtitleEnd ? SubtitleLine : NAME_None;
+}
+
 void UAIBAudioSubsystem::PlaySfx(FName SfxId, float Volume, float Pitch)
 {
 	UWorld* World = GetAudioWorld();
@@ -284,8 +311,9 @@ void UAIBAudioSubsystem::Tick(float DeltaTime)
 	// Duck the music under voice lines.
 	CheckWorld();
 	const bool bVoicePlaying = IsValid(Voice) && Voice->IsPlaying();
-	const float Target = bVoicePlaying ? 0.4f : 1.f;
-	const float NewDuck = FMath::FInterpTo(Duck, Target, DeltaTime, 3.f);
+	// Music sits well under the voice, then swells back slowly once the line ends.
+	const float Target = bVoicePlaying ? 0.25f : 1.f;
+	const float NewDuck = FMath::FInterpTo(Duck, Target, DeltaTime, bVoicePlaying ? 4.f : 1.2f);
 	if (!FMath::IsNearlyEqual(NewDuck, Duck, 0.002f))
 	{
 		Duck = NewDuck;

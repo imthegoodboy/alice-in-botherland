@@ -99,12 +99,6 @@ AAIBCharacter::AAIBCharacter()
 	SymbolLight->SetCastShadows(false);
 	SymbolLight->SetVisibility(false);
 
-	CommunityRing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CommunityRing"));
-	CommunityRing->SetupAttachment(RootComponent);
-	CommunityRing->SetRelativeLocation(FVector(0.f, 0.f, -92.f));
-	CommunityRing->SetRelativeScale3D(FVector(0.9f, 0.9f, 0.004f));
-	CommunityRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	CommunityRing->SetCastShadow(false);
 }
 
 void AAIBCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -117,16 +111,6 @@ void AAIBCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 void AAIBCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	// A thin glowing ring at the feet (a flat disc read as a solid plate floating under the champion).
-	if (UStaticMesh* Ring = AIBAssets::Mesh(AIBAssets::Paths::Env + TEXT("NumberRoom/SM_HoloRing")))
-	{
-		CommunityRing->SetStaticMesh(Ring);
-		CommunityRing->SetRelativeScale3D(FVector(0.45f, 0.45f, 0.2f));
-	}
-	else if (UStaticMesh* Cyl = AIBAssets::Cylinder())
-	{
-		CommunityRing->SetStaticMesh(Cyl);
-	}
 	ApplyCommunityLook();
 }
 
@@ -183,8 +167,6 @@ void AAIBCharacter::ApplyCommunityLook()
 		}
 	}
 
-	RingMID = AIBAssets::MakeHologram(this, Color, 0.55f);
-	CommunityRing->SetMaterial(0, RingMID);
 }
 
 void AAIBCharacter::Tick(float DeltaSeconds)
@@ -334,10 +316,6 @@ void AAIBCharacter::MulticastEliminated_Implementation()
 	EffectComponents.Add(Flash);
 	ActiveEffect = EEffect::Eliminated;
 	EffectStartTime = GetWorld()->GetTimeSeconds();
-	if (RingMID)
-	{
-		AIBAssets::SetColor(RingMID, FLinearColor(0.6f, 0.02f, 0.02f));
-	}
 }
 
 void AAIBCharacter::MulticastSacrifice_Implementation()

@@ -8,6 +8,10 @@
 #include "Game/AIBPlayerState.h"
 #include "Core/AIBGameInstance.h"
 #include "Audio/AIBAudioSubsystem.h"
+#include "Audio/AIBNarration.h"
+#include "OnlineSubsystemUtils.h"
+#include "Interfaces/VoiceInterface.h"
+#include "World/AIBLoreStones.h"
 #include "Online/AIBSessionSubsystem.h"
 #include "World/AIBWorldSubsystem.h"
 #include "World/AIBFleet.h"
@@ -84,11 +88,7 @@ void AAIBPlayerController::BeginPlay()
 		return;
 	}
 
-	if (UAIBGameInstance* GI = GetGameInstance<UAIBGameInstance>())
-	{
-		MouseSensitivity = GI->GetSettings().MouseSensitivity;
-		bInvertY = GI->GetSettings().bInvertY;
-	}
+	ApplySettings();
 
 	FActorSpawnParameters Params;
 	Params.ObjectFlags |= RF_Transient;
@@ -148,6 +148,7 @@ void AAIBPlayerController::BuildInput()
 	IA_Reset = MakeAction(TEXT("IA_Reset"), EInputActionValueType::Boolean);
 	IA_SpectateNext = MakeAction(TEXT("IA_SpectateNext"), EInputActionValueType::Boolean);
 	IA_SpectatePrev = MakeAction(TEXT("IA_SpectatePrev"), EInputActionValueType::Boolean);
+	IA_Talk = MakeAction(TEXT("IA_Talk"), EInputActionValueType::Boolean);
 
 	auto Negate = [this]() { return NewObject<UInputModifierNegate>(Mapping); };
 	auto SwizzleYX = [this]()
@@ -203,6 +204,8 @@ void AAIBPlayerController::BuildInput()
 	Mapping->MapKey(IA_SpectateNext, EKeys::Gamepad_RightShoulder);
 	Mapping->MapKey(IA_SpectatePrev, EKeys::RightMouseButton);
 	Mapping->MapKey(IA_SpectatePrev, EKeys::Gamepad_LeftShoulder);
+	Mapping->MapKey(IA_Talk, EKeys::V);
+	Mapping->MapKey(IA_Talk, EKeys::Gamepad_DPad_Up);
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -245,6 +248,8 @@ void AAIBPlayerController::SetupInputComponent()
 	Input->BindAction(IA_Reset, ETriggerEvent::Started, this, &AAIBPlayerController::OnResetVehicle);
 	Input->BindAction(IA_SpectateNext, ETriggerEvent::Started, this, &AAIBPlayerController::OnSpectateNext);
 	Input->BindAction(IA_SpectatePrev, ETriggerEvent::Started, this, &AAIBPlayerController::OnSpectatePrev);
+	Input->BindAction(IA_Talk, ETriggerEvent::Started, this, &AAIBPlayerController::OnTalk);
+	Input->BindAction(IA_Talk, ETriggerEvent::Completed, this, &AAIBPlayerController::OnTalk);
 }
 
 bool AAIBPlayerController::IsMovementAllowed() const
@@ -257,6 +262,8 @@ bool AAIBPlayerController::IsMovementAllowed() const
 	switch (GS->Phase)
 	{
 	case EAIBPhase::IslandExplore:
+	case EAIBPhase::Stage1Briefing:
+	case EAIBPhase::Stage2Briefing:
 	case EAIBPhase::Stage2Communication:
 	case EAIBPhase::Stage2Guess:
 	case EAIBPhase::Stage2Results:
@@ -299,7 +306,7 @@ void AAIBPlayerController::OnLook(const FInputActionValue& Value)
 void AAIBPlayerController::OnJumpStarted()
 {
 	const AAIBGameState* GS = GetAIBGameState();
-	if (GS && GS->Phase == EAIBPhase::ArrivalCinematic)
+	if (GS && (GS->Phase == EAIBPhase::ArrivalCinematic || GS->Phase == EAIBPhase::StoryIntro))
 	{
 		RequestSkip();
 		return;
@@ -329,9 +336,36 @@ void AAIBPlayerController::OnSprint(const FInputActionValue& Value)
 	}
 }
 
+void AAIBPlayerController::OnTalk(const FInputActionValue& Value)
+{
+	bTalkHeld = Value.Get<bool>();
+}
+
+int32 AAIBPlayerController::GetLoreFound() const
+{
+	const AAIBPlayerState* PS = GetAIBPlayerState();
+	return LocalLoreFound | (PS ? PS->LoreFound : 0);
+}
+
 void AAIBPlayerController::OnInteract(const FInputActionValue& Value)
 {
 	const bool bHeld = Value.Get<bool>();
+	if (bHeld && NearLore != INDEX_NONE)
+	{
+		// Read a marker stone: Alice tells this part of the island's past.
+		const int32 Index = NearLore;
+		LocalLoreFound |= 1 << Index;
+		ServerDiscoverLore(Index);
+		if (UAIBAudioSubsystem* Audio = GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>())
+		{
+			Audio->PlaySfx(TEXT("SFX_Correct"), 0.6f);
+			Audio->PlayVoice(AAIBLoreStones::LineFor(Index));
+		}
+		const int32 Found = int32(FMath::CountBits64(uint64(GetLoreFound())));
+		Toasts.Add({ FText::Format(LOCTEXT("LoreFound", "Marker stone read  ({0} of {1})"), FText::AsNumber(Found), FText::AsNumber(AAIBLoreStones::Count)), float(GetWorld()->GetTimeSeconds()) });
+		NearLore = INDEX_NONE;
+		return;
+	}
 	if (bHeld != bHoldingInteract)
 	{
 		bHoldingInteract = bHeld;
@@ -342,7 +376,7 @@ void AAIBPlayerController::OnInteract(const FInputActionValue& Value)
 void AAIBPlayerController::OnChat()
 {
 	const AAIBGameState* GS = GetAIBGameState();
-	if (GS && GS->Phase == EAIBPhase::ArrivalCinematic)
+	if (GS && (GS->Phase == EAIBPhase::ArrivalCinematic || GS->Phase == EAIBPhase::StoryIntro))
 	{
 		RequestSkip();
 		return;
@@ -486,18 +520,19 @@ void AAIBPlayerController::PlayerTick(float DeltaTime)
 	{
 		LastPhaseSerial = GS->PhaseSerial;
 		DraftGuess = EAIBSymbol::None;
-		if (GS->Phase != EAIBPhase::ArrivalCinematic)
-		{
-			bLocalSkip = false;
-		}
-		else if (ChatLog.RemoveAll([](const FAIBChatMessage& Message) { return Message.bSystem; }) > 0 && Hud.IsValid())
+		bLocalSkip = false;
+		if (GS->Phase == EAIBPhase::StoryIntro && ChatLog.RemoveAll([](const FAIBChatMessage& Message) { return Message.bSystem; }) > 0 && Hud.IsValid())
 		{
 			// Lobby seat/leave notices are noise once the voyage starts.
 			Hud->RebuildChat();
 		}
 	}
+	ApplySettings();
 	UpdateZone();
 	UpdateCamera(DeltaTime);
+	UpdateNarration();
+	UpdateVoiceChat();
+	UpdateLore();
 	UpdateSymbols();
 	UpdateCountdownSounds();
 	UpdateInputMode();
@@ -571,6 +606,7 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 	case EAIBPhase::None:
 	case EAIBPhase::Lobby:
 	case EAIBPhase::LobbyCountdown:
+	case EAIBPhase::StoryIntro:
 		if (Fleet)
 		{
 			bCine = true;
@@ -582,15 +618,17 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 		if (Fleet)
 		{
 			bCine = true;
-			Shot = Fleet->GetArrivalCamera(Elapsed, FOV);
+			Shot = Fleet->GetArrivalCamera(AIB::ArrivalSkipTo + Elapsed, FOV);
 		}
 		break;
 	case EAIBPhase::IslandExplore:
+	case EAIBPhase::Stage1Briefing:
+	case EAIBPhase::Stage2Briefing:
 	case EAIBPhase::Stage2Communication:
 	case EAIBPhase::Stage2Guess:
+		// Free movement (including while Alice explains a trial's rules).
 		Follow = (MyPawn && !bSpectating) ? MyPawn : SpectatePawn();
 		break;
-	case EAIBPhase::Stage1Briefing:
 	case EAIBPhase::Stage1Elimination:
 		if (Numbers)
 		{
@@ -617,7 +655,6 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 			FOV = 50.f;
 		}
 		break;
-	case EAIBPhase::Stage2Briefing:
 	case EAIBPhase::Stage2Results:
 	case EAIBPhase::Stage2Elimination:
 		if (Hotel)
@@ -776,6 +813,129 @@ void AAIBPlayerController::UpdateInputMode()
 	}
 }
 
+void AAIBPlayerController::ApplySettings()
+{
+	UAIBGameInstance* GI = GetGameInstance<UAIBGameInstance>();
+	if (!GI)
+	{
+		return;
+	}
+	const FAIBSettings& S = GI->GetSettings();
+	MouseSensitivity = S.MouseSensitivity;
+	bInvertY = S.bInvertY;
+	FieldOfView = FMath::Clamp(S.FieldOfView, 60.f, 110.f);
+	MicMode = S.MicMode;
+#if !UE_BUILD_SHIPPING
+	// Development: -AIBMic=2 forces an open microphone (voice chat testing).
+	FParse::Value(FCommandLine::Get(), TEXT("AIBMic="), MicMode);
+#endif
+	if (AAIBCharacter* MyCharacter = Cast<AAIBCharacter>(GetPawn()))
+	{
+		if (UCameraComponent* Camera = MyCharacter->GetFollowCamera())
+		{
+			Camera->SetFieldOfView(FieldOfView);
+		}
+	}
+}
+
+void AAIBPlayerController::UpdateNarration()
+{
+	const AAIBGameState* GS = GetAIBGameState();
+	UAIBAudioSubsystem* Audio = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>() : nullptr;
+	if (!GS || !Audio)
+	{
+		return;
+	}
+	if (GS->PhaseSerial != NarrationSerial)
+	{
+		// A new phase: anything Alice was still saying about the previous one stops.
+		if (NarrationSerial != -1 && NarrationBeat != INDEX_NONE)
+		{
+			Audio->StopNarration();
+		}
+		NarrationSerial = GS->PhaseSerial;
+		NarrationBeat = INDEX_NONE;
+		if (GS->Phase == EAIBPhase::Results)
+		{
+			Audio->PlayVoice(TEXT("NAR_Results"));
+		}
+	}
+	// Alice greets each champion once, when they first arrive at the gathering.
+	if (!bLobbyWelcomed && GS->Phase == EAIBPhase::Lobby && !GS->bAITestMode && GetLocalSlot() != INDEX_NONE && GS->GetPhaseElapsed() > 1.5f)
+	{
+		bLobbyWelcomed = true;
+		Audio->PlayVoice(TEXT("NAR_Lobby_Welcome"));
+	}
+	const EAIBNarration Which = AIBNarration::ForPhase(GS->Phase);
+	if (Which == EAIBNarration::None)
+	{
+		return;
+	}
+	const float Elapsed = GS->GetPhaseElapsed();
+	const int32 Beat = AIBNarration::BeatAt(Which, Elapsed);
+	if (Beat == INDEX_NONE || Beat == NarrationBeat)
+	{
+		return;
+	}
+	NarrationBeat = Beat;
+	const AIBNarration::FSequence& Sequence = AIBNarration::Get(Which);
+	// Someone joining mid-line waits for the next one rather than starting halfway through a sentence.
+	if (Elapsed - Sequence.Starts[Beat] < 1.f)
+	{
+		Audio->PlayVoice(Sequence.Beats[Beat].Line);
+	}
+}
+
+void AAIBPlayerController::UpdateVoiceChat()
+{
+	// Champions who joined by room code have no online session, so the engine never registers their microphone:
+	// register it here (once). Registering opens the microphone, so restore what the settings ask for afterwards.
+	if (!bVoiceRegistered)
+	{
+		const ULocalPlayer* LP = GetLocalPlayer();
+		IOnlineVoicePtr VoiceInterface = LP ? Online::GetVoiceInterface(GetWorld()) : nullptr;
+		if (VoiceInterface.IsValid())
+		{
+			bVoiceRegistered = true;
+			VoiceInterface->RegisterLocalTalker(LP->GetControllerId());
+			ToggleSpeaking(bSpeaking);
+		}
+	}
+	const bool bWant = MicMode == 2 || (MicMode == 1 && bTalkHeld);
+	if (bWant != bSpeaking)
+	{
+		bSpeaking = bWant;
+		ToggleSpeaking(bWant);
+		ServerSetTalking(bWant);
+	}
+}
+
+void AAIBPlayerController::UpdateLore()
+{
+	NearLore = INDEX_NONE;
+	const AAIBGameState* GS = GetAIBGameState();
+	const APawn* MyPawn = GetPawn();
+	const UAIBWorldSubsystem* WorldSys = GetWorld()->GetSubsystem<UAIBWorldSubsystem>();
+	const AAIBLoreStones* Stones = WorldSys ? WorldSys->GetLoreStones() : nullptr;
+	if (GS && GS->Phase == EAIBPhase::Lobby)
+	{
+		LocalLoreFound = 0;
+	}
+	if (!GS || GS->Phase != EAIBPhase::IslandExplore || !MyPawn || !Stones)
+	{
+		return;
+	}
+	const int32 Found = GetLoreFound();
+	for (int32 Index = 0; Index < AAIBLoreStones::Count; ++Index)
+	{
+		if (!(Found & (1 << Index)) && FVector::Dist2D(MyPawn->GetActorLocation(), Stones->GetStoneLocation(Index)) < AAIBLoreStones::ReadRadius)
+		{
+			NearLore = Index;
+			break;
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // RPCs
 // ---------------------------------------------------------------------------------------------------------------------
@@ -789,6 +949,10 @@ void AAIBPlayerController::ServerSetReady_Implementation(bool bReady) { if (AAIB
 void AAIBPlayerController::ServerAddBot_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestAddBot(this); }
 void AAIBPlayerController::ServerFillBots_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestFillBots(this); }
 void AAIBPlayerController::ServerRemoveSeat_Implementation(int32 Slot) { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestRemoveSeat(this, Slot); }
+void AAIBPlayerController::ServerStartMatch_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestStart(this); }
+void AAIBPlayerController::ServerSetAITestMode_Implementation(bool bOn) { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestSetAITestMode(this, bOn); }
+void AAIBPlayerController::ServerDiscoverLore_Implementation(int32 Index) { if (AAIBGameMode* GM = AIBMode(this)) GM->DiscoverLore(this, Index); }
+void AAIBPlayerController::ServerSetTalking_Implementation(bool bTalking) { if (AAIBGameMode* GM = AIBMode(this)) GM->SetTalking(this, bTalking); }
 void AAIBPlayerController::ServerSkipCinematic_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestSkipCinematic(this); }
 void AAIBPlayerController::ServerReturnToLobby_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestReturnToLobby(this); }
 void AAIBPlayerController::ServerSubmitNumber_Implementation(int32 Number) { if (AAIBGameMode* GM = AIBMode(this)) GM->SubmitNumber(this, Number); }

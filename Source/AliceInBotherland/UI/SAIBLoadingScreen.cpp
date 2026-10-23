@@ -7,6 +7,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
@@ -28,7 +29,7 @@ void SAIBLoadingScreen::Construct(const FArguments& InArgs)
 		LOCTEXT("Tip5", "Symbols can repeat. Seeing three different symbols tells you nothing about your own.")
 	};
 	const FText Tip = Tips[FMath::RandRange(0, UE_ARRAY_COUNT(Tips) - 1)];
-	const FSlateBrush* Emblem = AIBStyle::Image(TEXT("Logo_Emblem.png"), FVector2D(220.f, 220.f));
+	const FSlateBrush* Background = AIBStyle::StoryImage(TEXT("L_Loading"));
 
 	ChildSlot
 	[
@@ -38,38 +39,48 @@ void SAIBLoadingScreen::Construct(const FArguments& InArgs)
 		.Padding(0.f)
 		[
 			SNew(SOverlay)
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+			// The island at dusk behind everything, shaded towards the bottom where the text sits.
+			+ SOverlay::Slot()
 			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				SNew(SScaleBox)
+				.Stretch(EStretch::ScaleToFill)
+				.Visibility(Background ? EVisibility::HitTestInvisible : EVisibility::Collapsed)
 				[
-					SNew(SBox).WidthOverride(220.f).HeightOverride(220.f)
-					.Visibility(Emblem ? EVisibility::Visible : EVisibility::Collapsed)
-					[
-						SNew(SImage).Image(Emblem).ColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.85f))
-					]
-				]
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 18.f, 0.f, 0.f)
-				[
-					SNew(STextBlock).Text(LOCTEXT("Title", "ALICE IN BOTHERLAND")).Font(AIBStyle::Title(64)).ColorAndOpacity(AIBStyle::Text())
-				]
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-				[
-					SNew(STextBlock).Text(LOCTEXT("Sub", "THE LAST ISLAND")).Font(AIBStyle::StoryBold(20)).ColorAndOpacity(AIBStyle::Blood())
+					SNew(SImage).Image(Background)
 				]
 			]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(80.f, 0.f, 80.f, 70.f)
+			+ SOverlay::Slot().VAlign(VAlign_Bottom)
+			[
+				SNew(SBox).HeightOverride(520.f)
+				[
+					SNew(SAIBGradient).Colors({ FLinearColor(0.f, 0.f, 0.f, 0.f), FLinearColor(0.f, 0.f, 0.f, 0.6f), FLinearColor(0.f, 0.f, 0.f, 0.92f) })
+				]
+			]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(90.f, 0.f, 90.f, 70.f)
 			[
 				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(SThrobber)
+					SNew(STextBlock).Text(LOCTEXT("Title", "ALICE IN BOTHERLAND")).Font(AIBStyle::Title(72)).ColorAndOpacity(AIBStyle::Text())
+					.ShadowOffset(FVector2D(2.f, 2.f)).ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.7f))
 				]
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 14.f, 0.f, 0.f)
+				+ SVerticalBox::Slot().AutoHeight().Padding(2.f, -8.f, 0.f, 18.f)
 				[
-					SNew(SBox).MaxDesiredWidth(900.f)
+					SNew(STextBlock).Text(LOCTEXT("Sub", "THE LAST ISLAND")).Font(AIBStyle::StoryBold(22)).ColorAndOpacity(AIBStyle::Gold())
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 16.f, 0.f)
 					[
-						SNew(STextBlock).Text(Tip).Font(AIBStyle::Body(17)).ColorAndOpacity(AIBStyle::TextDim()).WrapTextAt(900.f).Justification(ETextJustify::Center)
+						SNew(SThrobber)
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SBox).MaxDesiredWidth(900.f)
+						[
+							SNew(STextBlock).Text(Tip).Font(AIBStyle::BodyMedium(17)).ColorAndOpacity(AIBStyle::Text()).WrapTextAt(900.f)
+						]
 					]
 				]
 			]
@@ -90,30 +101,55 @@ void SAIBSettingsPanel::Construct(const FArguments& InArgs)
 		Working = GameInstance->GetSettings();
 	}
 
+	TSharedRef<SVerticalBox> Left = SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("Audio", "AUDIO"))]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Master", "Master volume"), &FAIBSettings::MasterVolume, 0.f, 1.f, EFormat::Percent)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Music", "Music"), &FAIBSettings::MusicVolume, 0.f, 1.f, EFormat::Percent)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Sfx", "Effects"), &FAIBSettings::SfxVolume, 0.f, 1.f, EFormat::Percent)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Voice", "Narrator voice"), &FAIBSettings::VoiceVolume, 0.f, 1.f, EFormat::Percent)]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("VoiceChat", "VOICE CHAT"))]
+		+ SVerticalBox::Slot().AutoHeight()[MakeChoiceRow(LOCTEXT("Mic", "Microphone"), &FAIBSettings::MicMode, { LOCTEXT("MicOff", "OFF"), LOCTEXT("MicPtt", "HOLD V"), LOCTEXT("MicOpen", "ALWAYS ON") })]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f, 0.f, 0.f)
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("MicHelp", "Talk to the other champions. HOLD V sends your voice only while the key is held."))
+			.Font(AIBStyle::Body(13)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("Captions", "CAPTIONS"))]
+		+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("Subtitles", "Show captions"), &FAIBSettings::bSubtitles)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("CaptionSize", "Caption size"), &FAIBSettings::SubtitleScale, 0.8f, 1.5f, EFormat::Percent)];
+
+	TSharedRef<SVerticalBox> Right = SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("Controls", "CONTROLS & CAMERA"))]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Sens", "Mouse sensitivity"), &FAIBSettings::MouseSensitivity, 0.2f, 3.f, EFormat::Value)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("Invert", "Invert look up/down"), &FAIBSettings::bInvertY)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Fov", "Field of view"), &FAIBSettings::FieldOfView, 60.f, 110.f, EFormat::Degrees)]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("Graphics", "GRAPHICS"))]
+		+ SVerticalBox::Slot().AutoHeight()[MakeChoiceRow(LOCTEXT("Quality", "Quality"), &FAIBSettings::Quality, { LOCTEXT("Low", "LOW"), LOCTEXT("Med", "MEDIUM"), LOCTEXT("High", "HIGH"), LOCTEXT("Epic", "EPIC") })]
+		+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("ResScale", "Render resolution"), &FAIBSettings::ResolutionScale, 50.f, 100.f, EFormat::Value)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("Fullscreen", "Fullscreen"), &FAIBSettings::bFullscreen)]
+		+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("VSync", "VSync"), &FAIBSettings::bVSync)];
+
 	ChildSlot
 	[
-		SNew(SBox).WidthOverride(620.f)
+		SNew(SBox).WidthOverride(1060.f)
 		[
 			AIBUI::Panel(
 				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 12.f)
+				[
+					SNew(STextBlock).Text(LOCTEXT("Settings", "SETTINGS")).Font(AIBStyle::Title(46)).ColorAndOpacity(AIBStyle::Text())
+				]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
-					SNew(STextBlock).Text(LOCTEXT("Settings", "SETTINGS")).Font(AIBStyle::Title(44)).ColorAndOpacity(AIBStyle::Text())
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 22.f, 0.f)[Left]
+					+ SHorizontalBox::Slot().AutoWidth()
+					[
+						SNew(SBox).WidthOverride(1.f)[SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(AIBStyle::Line())]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(22.f, 0.f, 0.f, 0.f)[Right]
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f)[AIBUI::Header(LOCTEXT("Audio", "AUDIO"))]
-				+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Master", "Master volume"), &FAIBSettings::MasterVolume, 0.f, 1.f, true)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Music", "Music"), &FAIBSettings::MusicVolume, 0.f, 1.f, true)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Sfx", "Effects"), &FAIBSettings::SfxVolume, 0.f, 1.f, true)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Voice", "Voice"), &FAIBSettings::VoiceVolume, 0.f, 1.f, true)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("Subtitles", "Subtitles"), &FAIBSettings::bSubtitles)]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 10.f)[AIBUI::Header(LOCTEXT("Controls", "CONTROLS"))]
-				+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("Sens", "Mouse sensitivity"), &FAIBSettings::MouseSensitivity, 0.2f, 3.f, false)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("Invert", "Invert look up/down"), &FAIBSettings::bInvertY)]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 10.f)[AIBUI::Header(LOCTEXT("Graphics", "GRAPHICS"))]
-				+ SVerticalBox::Slot().AutoHeight()[MakeQualityRow()]
-				+ SVerticalBox::Slot().AutoHeight()[MakeSlider(LOCTEXT("ResScale", "Render resolution"), &FAIBSettings::ResolutionScale, 50.f, 100.f, false)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("Fullscreen", "Fullscreen"), &FAIBSettings::bFullscreen)]
-				+ SVerticalBox::Slot().AutoHeight()[MakeToggle(LOCTEXT("VSync", "VSync"), &FAIBSettings::bVSync)]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 20.f, 0.f, 0.f).HAlign(HAlign_Right)
 				[
 					SNew(SAIBButton)
@@ -132,6 +168,18 @@ void SAIBSettingsPanel::Construct(const FArguments& InArgs)
 	];
 }
 
+void SAIBSettingsPanel::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+{
+	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+	// Hidden panels don't tick, so a gap means the panel was just reopened: pick up changes made elsewhere since
+	// (e.g. the lobby's microphone button).
+	if (InCurrentTime - LastTick > 0.5 && GameInstance.IsValid())
+	{
+		Working = GameInstance->GetSettings();
+	}
+	LastTick = InCurrentTime;
+}
+
 void SAIBSettingsPanel::Commit(bool bSave)
 {
 	if (UAIBGameInstance* GI = GameInstance.Get())
@@ -148,7 +196,7 @@ void SAIBSettingsPanel::Commit(bool bSave)
 	}
 }
 
-TSharedRef<SWidget> SAIBSettingsPanel::MakeSlider(const FText& Label, float FAIBSettings::* Field, float Min, float Max, bool bPercent)
+TSharedRef<SWidget> SAIBSettingsPanel::MakeSlider(const FText& Label, float FAIBSettings::* Field, float Min, float Max, EFormat Format)
 {
 	return SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().FillWidth(0.42f).VAlign(VAlign_Center).Padding(0.f, 6.f)
@@ -174,14 +222,15 @@ TSharedRef<SWidget> SAIBSettingsPanel::MakeSlider(const FText& Label, float FAIB
 			SNew(STextBlock)
 			.Font(AIBStyle::SubHeading(16))
 			.ColorAndOpacity(AIBStyle::TextDim())
-			.Text_Lambda([this, Field, bPercent]()
+			.Text_Lambda([this, Field, Format]()
 			{
 				const float Value = Working.*Field;
-				if (bPercent)
+				switch (Format)
 				{
-					return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Value * 100.f)));
+				case EFormat::Percent: return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Value * 100.f)));
+				case EFormat::Degrees: return FText::FromString(FString::Printf(TEXT("%d\u00B0"), FMath::RoundToInt(Value)));
+				default: return Value >= 10.f ? FText::FromString(FString::Printf(TEXT("%.0f%%"), Value)) : FText::FromString(FString::Printf(TEXT("%.2f"), Value));
 				}
-				return Value >= 10.f ? FText::FromString(FString::Printf(TEXT("%.0f%%"), Value)) : FText::FromString(FString::Printf(TEXT("%.2f"), Value));
 			})
 		];
 }
@@ -206,33 +255,34 @@ TSharedRef<SWidget> SAIBSettingsPanel::MakeToggle(const FText& Label, bool FAIBS
 		];
 }
 
-TSharedRef<SWidget> SAIBSettingsPanel::MakeQualityRow()
+TSharedRef<SWidget> SAIBSettingsPanel::MakeChoiceRow(const FText& Label, int32 FAIBSettings::* Field, TArray<FText> Names)
 {
-	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox)
-		+ SHorizontalBox::Slot().FillWidth(0.3f).VAlign(VAlign_Center).Padding(0.f, 6.f)
-		[
-			SNew(STextBlock).Text(LOCTEXT("Quality", "Quality")).Font(AIBStyle::BodyMedium(16)).ColorAndOpacity(AIBStyle::Text())
-		];
-	const FText Names[] = { LOCTEXT("Low", "LOW"), LOCTEXT("Med", "MEDIUM"), LOCTEXT("High", "HIGH"), LOCTEXT("Epic", "EPIC") };
-	for (int32 Level = 0; Level < 4; ++Level)
+	// Label above, choices across the full width (so longer words like MEDIUM fit).
+	TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+	for (int32 Choice = 0; Choice < Names.Num(); ++Choice)
 	{
-		Row->AddSlot().FillWidth(0.175f).Padding(3.f, 0.f)
+		Row->AddSlot().FillWidth(1.f).Padding(Choice == 0 ? 0.f : 3.f, 0.f, Choice == Names.Num() - 1 ? 0.f : 3.f, 0.f)
 		[
 			SNew(SAIBButton)
-			.Text(Names[Level])
+			.Text(Names[Choice])
 			.FontSize(14)
 			.Height(36.f)
 			.Kind(EAIBButtonKind::Secondary)
-			.AccentColor_Lambda([this, Level]() { return Working.Quality == Level ? AIBStyle::Blood() : FLinearColor::Transparent; })
-			.OnClicked_Lambda([this, Level]()
+			.AccentColor_Lambda([this, Field, Choice]() { return Working.*Field == Choice ? AIBStyle::Blood() : FLinearColor::Transparent; })
+			.OnClicked_Lambda([this, Field, Choice]()
 			{
-				Working.Quality = Level;
+				Working.*Field = Choice;
 				Commit(false);
 				return FReply::Handled();
 			})
 		];
 	}
-	return Row;
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f, 0.f, 4.f)
+		[
+			SNew(STextBlock).Text(Label).Font(AIBStyle::BodyMedium(16)).ColorAndOpacity(AIBStyle::Text())
+		]
+		+ SVerticalBox::Slot().AutoHeight()[Row];
 }
 
 #undef LOCTEXT_NAMESPACE

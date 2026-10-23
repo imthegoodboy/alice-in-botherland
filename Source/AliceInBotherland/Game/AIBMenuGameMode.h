@@ -33,9 +33,6 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PlayerTick(float DeltaTime) override;
 
-	/** Camera path for the prologue (0..1) or idle drift (<0). */
-	float PrologueAlpha = -1.f;
-
 protected:
 	UPROPERTY()
 	TObjectPtr<ACameraActor> MenuCamera;

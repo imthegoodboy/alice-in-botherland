@@ -232,6 +232,38 @@ int32 SAIBTimerRing::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGe
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// SAIBGradient
+// ---------------------------------------------------------------------------------------------------------------------
+
+void SAIBGradient::Construct(const FArguments& InArgs)
+{
+	Colors = InArgs._Colors;
+	bVertical = InArgs._Vertical;
+	SetVisibility(EVisibility::HitTestInvisible);
+}
+
+int32 SAIBGradient::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+{
+	if (Colors.Num() < 2)
+	{
+		return LayerId;
+	}
+	const FVector2D LocalSize = AllottedGeometry.GetLocalSize();
+	const float Opacity = InWidgetStyle.GetColorAndOpacityTint().A;
+	TArray<FSlateGradientStop> Stops;
+	for (int32 Index = 0; Index < Colors.Num(); ++Index)
+	{
+		const float T = float(Index) / (Colors.Num() - 1);
+		FLinearColor Color = Colors[Index];
+		Color.A *= Opacity;
+		// Slate's "horizontal" gradient has horizontal bands, i.e. its stops run down the Y axis.
+		Stops.Add(FSlateGradientStop(bVertical ? FVector2D(0.f, LocalSize.Y * T) : FVector2D(LocalSize.X * T, 0.f), Color));
+	}
+	FSlateDrawElement::MakeGradient(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Stops, bVertical ? Orient_Horizontal : Orient_Vertical);
+	return LayerId + 1;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -278,6 +310,24 @@ namespace AIBUI
 		return SNew(SBox).HeightOverride(1.f)
 			[
 				SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(AIBStyle::Line())
+			];
+	}
+
+	TSharedRef<SWidget> TalkDot(const TAttribute<bool>& bTalking, float Size)
+	{
+		return SNew(SBox)
+			.WidthOverride(Size)
+			.HeightOverride(Size)
+			.Visibility_Lambda([bTalking]() { return bTalking.Get() ? EVisibility::HitTestInvisible : EVisibility::Hidden; })
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::RoundBrush(Size * 0.5f))
+				.BorderBackgroundColor_Lambda([]()
+				{
+					FLinearColor C = AIBStyle::Acid();
+					C.A = 0.65f + 0.35f * FMath::Sin(FPlatformTime::Seconds() * 9.0);
+					return FSlateColor(C);
+				})
 			];
 	}
 

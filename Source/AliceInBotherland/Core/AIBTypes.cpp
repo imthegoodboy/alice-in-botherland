@@ -117,6 +117,7 @@ namespace AIB
 		{
 		case EAIBPhase::Lobby: return LOCTEXT("PhLobby", "Lobby");
 		case EAIBPhase::LobbyCountdown: return LOCTEXT("PhLobbyCount", "The trials begin in");
+		case EAIBPhase::StoryIntro: return LOCTEXT("PhStory", "The story so far");
 		case EAIBPhase::ArrivalCinematic: return LOCTEXT("PhArrival", "Arrival");
 		case EAIBPhase::IslandExplore: return LOCTEXT("PhExplore", "The first trial begins in");
 		case EAIBPhase::Stage1Briefing: return LOCTEXT("PhS1Brief", "Stage 1 - The Number Game");
@@ -151,6 +152,7 @@ namespace AIB
 		case EAIBPhase::Lobby:
 		case EAIBPhase::LobbyCountdown:
 			return EAIBSceneZone::Lobby;
+		case EAIBPhase::StoryIntro:
 		case EAIBPhase::ArrivalCinematic:
 			return EAIBSceneZone::Sea;
 		case EAIBPhase::IslandExplore:

@@ -34,6 +34,10 @@ public:
 	void PlayMusic(FName TrackId);
 	void StopMusic(float FadeOut = 2.f);
 	void PlayVoice(FName LineId);
+	/** Stops Alice mid-sentence (her sequence's phase ended early, e.g. skipped). */
+	void StopNarration();
+	/** Voice line currently captioned (None when silent). */
+	FName GetSubtitleLine() const;
 	void PlaySfx(FName SfxId, float Volume = 1.f, float Pitch = 1.f);
 	void SetAmbienceForZone(EAIBSceneZone Zone);
 

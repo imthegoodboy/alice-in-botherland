@@ -18,6 +18,9 @@ void AAIBGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AAIBGameState, Phase);
+	DOREPLIFETIME(AAIBGameState, RoomCode);
+	DOREPLIFETIME(AAIBGameState, RoomCodeInternet);
+	DOREPLIFETIME(AAIBGameState, bAITestMode);
 	DOREPLIFETIME(AAIBGameState, PhaseStartTime);
 	DOREPLIFETIME(AAIBGameState, PhaseEndTime);
 	DOREPLIFETIME(AAIBGameState, PhaseSerial);

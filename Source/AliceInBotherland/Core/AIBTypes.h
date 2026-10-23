@@ -12,6 +12,7 @@ enum class EAIBPhase : uint8
 	None,
 	Lobby,
 	LobbyCountdown,
+	StoryIntro,
 	ArrivalCinematic,
 	IslandExplore,
 	Stage1Briefing,
@@ -214,11 +215,15 @@ namespace AIB
 	constexpr int32 Stage2Rounds = 3;
 
 	// Timers from the design document (seconds).
-	constexpr float LobbyCountdown = 15.f;
+	/** After the host presses START (everyone seated and ready). */
+	constexpr float LobbyCountdown = 5.f;
 	constexpr float LobbyReconnect = 30.f;
 	constexpr float StageReconnect = 20.f;
-	constexpr float ArrivalCinematic = 20.f;
-	constexpr float IslandExplore = 45.f;
+	/** The fleet's full voyage takes ArrivalVoyage seconds; the arrival shows only its last part (the landing in the cove). */
+	constexpr float ArrivalVoyage = 20.f;
+	constexpr float ArrivalSkipTo = 12.f;
+	constexpr float ArrivalCinematic = ArrivalVoyage - ArrivalSkipTo;
+	constexpr float IslandExplore = 120.f;
 	constexpr float Stage1Briefing = 10.f;
 	constexpr float Stage1RoundIntro = 5.f;
 	constexpr float Stage1Selection = 10.f;

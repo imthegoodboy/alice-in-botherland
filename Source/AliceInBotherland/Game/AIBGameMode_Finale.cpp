@@ -67,10 +67,7 @@ void AAIBGameMode::Stage3_Enter()
 
 	Stage3_PlaceVehicles(false);
 	Cue(TEXT("SFX_Stinger_Title"));
-	Cue(TEXT("VO_Stage3_Brief"));
 	Cue(TEXT("MUS_Race"));
-	Announce(LOCTEXT("S3Title", "STAGE 3  -  RACE TO THE GUARDIAN"),
-		LOCTEXT("S3Sub", "Follow the green flares to the beam of light. Stop on the switch and hold [E] for 3 seconds."), FLinearColor(0.6f, 1.f, 0.5f));
 }
 
 void AAIBGameMode::Stage3_PlaceVehicles(bool bSuddenDeath)
@@ -349,10 +346,7 @@ void AAIBGameMode::Final_Enter()
 	GS->Ending = EAIBEnding::None;
 	GS->ChampionSlot = INDEX_NONE;
 	Cue(TEXT("SFX_Guardian_Rumble"));
-	Cue(TEXT("VO_Final_Brief"));
 	Cue(TEXT("MUS_Final"));
-	Announce(LOCTEXT("FinalTitle", "THE GUARDIAN'S CHOICE"),
-		LOCTEXT("FinalSub", "BECOME THE KING: you win, your people are lost.   SAVE YOUR PEOPLE: you die, they live. No choice = King."), FLinearColor(1.f, 0.75f, 0.35f));
 }
 
 void AAIBGameMode::Final_BeginChoice()

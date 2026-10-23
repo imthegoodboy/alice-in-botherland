@@ -86,10 +86,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "AIB")
 	TObjectPtr<UPointLightComponent> SymbolLight;
 
-	/** Soft ring of the community colour on the ground (identifies champions from above). */
-	UPROPERTY(VisibleAnywhere, Category = "AIB")
-	TObjectPtr<UStaticMeshComponent> CommunityRing;
-
 	UPROPERTY(ReplicatedUsing = OnRep_Sprinting)
 	bool bSprinting = false;
 
@@ -102,8 +98,6 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> SymbolMID;
 
-	UPROPERTY()
-	TObjectPtr<UMaterialInstanceDynamic> RingMID;
 
 	/** Transient effect pieces spawned by the FX multicasts. */
 	UPROPERTY()

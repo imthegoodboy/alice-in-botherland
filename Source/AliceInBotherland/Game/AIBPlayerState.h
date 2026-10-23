@@ -72,6 +72,14 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	bool bWantsSkipCinematic = false;
 
+	/** Voice chat: the player's microphone is sending right now (drives the speaking icons). */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	bool bTalking = false;
+
+	/** Island marker stones this champion has read (bit per stone). */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	int32 LoreFound = 0;
+
 	// ---- Server only (never replicated) ----
 
 	/** Hidden symbol for the current Stage 2 round. Intentionally NOT replicated so clients can't read their own. */

@@ -11,6 +11,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
@@ -425,20 +426,6 @@ TSharedRef<SWidget> SAIBHud::MakeRacePanel()
 			const EAIBPhase P = Phase();
 			return P >= EAIBPhase::Stage3Briefing && P <= EAIBPhase::Stage3Finish ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed;
 		})
-		// Briefing card.
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 220.f, 0.f, 0.f)
-		[
-			SNew(SBox)
-			.Visibility_Lambda([this]() { return Phase() == EAIBPhase::Stage3Briefing ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-			.WidthOverride(760.f)
-			[
-				AIBUI::Panel(
-					SNew(STextBlock)
-					.Text(LOCTEXT("RaceBrief", "Follow the green flares to the beam of light. Drive into the glowing ring, stop, and HOLD [E] for 3 seconds. First to activate the switch chooses first. Winning the race is not winning the island."))
-					.Font(AIBStyle::BodyMedium(19)).ColorAndOpacity(AIBStyle::Text()).AutoWrapText(true).Justification(ETextJustify::Center),
-					FMargin(24.f, 16.f))
-			]
-		]
 		// Countdown.
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
@@ -603,30 +590,6 @@ TSharedRef<SWidget> SAIBHud::MakeFinalPanel()
 			const EAIBPhase P = Phase();
 			return P == EAIBPhase::FinalBriefing || P == EAIBPhase::FinalChoice ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed;
 		})
-		// Briefing: the two laws (under the banner, clear of the subtitles).
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 340.f, 0.f, 0.f)
-		[
-			SNew(SBox)
-			.Visibility_Lambda([this]() { return Phase() == EAIBPhase::FinalBriefing ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-			.WidthOverride(980.f)
-			[
-				AIBUI::Panel(
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 16.f, 0.f)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("BKTitle", "BECOME THE KING")).Font(AIBStyle::Title(38)).ColorAndOpacity(AIBStyle::Gold())]
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("BKBody", "Personal victory. You rule the island and your name goes down as champion - but your community does not survive. The match ends immediately.")).Font(AIBStyle::Body(17)).ColorAndOpacity(AIBStyle::Text()).AutoWrapText(true)]
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(16.f, 0.f, 0.f, 0.f)
-					[
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("SPTitle", "SAVE YOUR PEOPLE")).Font(AIBStyle::Title(38)).ColorAndOpacity(AIBStyle::Ice())]
-						+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(LOCTEXT("SPBody", "Personal sacrifice. You give your life; your community is evacuated to safety. The other finalist then makes their own choice.")).Font(AIBStyle::Body(17)).ColorAndOpacity(AIBStyle::Text()).AutoWrapText(true)]
-					],
-					FMargin(28.f, 20.f))
-			]
-		]
 		// Chooser: two cards.
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 70.f)
 		[
@@ -676,21 +639,25 @@ TSharedRef<SWidget> SAIBHud::MakeResultsPanel()
 		.Visibility_Lambda([this]() { return Phase() == EAIBPhase::Results ? EVisibility::Visible : EVisibility::Collapsed; })
 		.HAlign(HAlign_Center)
 		.VAlign(VAlign_Center)
+		.Padding(FMargin(0.f, 30.f))
 		[
-			SNew(SBox).WidthOverride(980.f)
+			SNew(SBox).WidthOverride(1060.f)
 			[
-				AIBUI::Panel(
+				SNew(SBorder)
+				.BorderImage(AIBStyle::PanelSolidBrush())
+				.Padding(FMargin(1.f))
+				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()[ResultsBox.ToSharedRef()]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f, 0.f, 0.f)
+					+ SVerticalBox::Slot().AutoHeight().Padding(30.f, 18.f, 30.f, 26.f)
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 6.f, 0.f)
 						[
 							SNew(SAIBButton)
 							.Kind(EAIBButtonKind::Primary)
-							.Text(LOCTEXT("PlayAgain", "RETURN TO LOBBY"))
-							.SubText_Lambda([this]() { return PC() && PC()->IsHost() ? FText::GetEmpty() : LOCTEXT("HostDecides", "Waiting for the host"); })
+							.Text(LOCTEXT("PlayAgain", "BACK TO THE ROOM"))
+							.SubText_Lambda([this]() { return PC() && PC()->IsHost() ? LOCTEXT("PlayAgainSub", "Everyone returns to the gathering") : LOCTEXT("HostDecides", "Waiting for the host"); })
 							.IsEnabled_Lambda([this]() { return PC() && PC()->IsHost(); })
 							.OnClicked_Lambda([this]() { if (PC()) PC()->ServerReturnToLobby(); return FReply::Handled(); })
 						]
@@ -700,8 +667,8 @@ TSharedRef<SWidget> SAIBHud::MakeResultsPanel()
 							.Text(LOCTEXT("MainMenu", "MAIN MENU"))
 							.OnClicked_Lambda([this]() { if (PC()) PC()->LeaveMatch(); return FReply::Handled(); })
 						]
-					],
-					FMargin(34.f), true)
+					]
+				]
 			]
 		];
 }
@@ -716,109 +683,197 @@ void SAIBHud::RebuildResults()
 	ResultsBox->ClearChildren();
 
 	const AAIBPlayerState* Champion = G->GetPlayerBySlot(G->ChampionSlot);
+	const FText ChampionName = FText::FromString(Champion ? Champion->GetPlayerName().ToUpper() : FString());
 	FText Headline;
+	FName Picture = TEXT("T4_Choice");
 	switch (G->Ending)
 	{
 	case EAIBEnding::KingFirst:
 	case EAIBEnding::SoloKing:
-		Headline = FText::Format(LOCTEXT("HKing", "{0} CLAIMED THE ISLAND - ALONE"), FText::FromString(Champion ? Champion->GetPlayerName().ToUpper() : FString()));
+		Headline = FText::Format(LOCTEXT("HKing", "{0} claimed the island - alone. Their people were left to the sea."), ChampionName);
 		break;
 	case EAIBEnding::SacrificeThenKing:
-		Headline = FText::Format(LOCTEXT("HSacKing", "{0} CLAIMED THE ISLAND FOR {1}"), FText::FromString(Champion ? Champion->GetPlayerName().ToUpper() : FString()), Champion ? Champion->GetCommunityName().ToUpper() : FText::GetEmpty());
+		Headline = FText::Format(LOCTEXT("HSacKing", "{0} claimed the island for {1}."), ChampionName, Champion ? Champion->GetCommunityName() : FText::GetEmpty());
+		Picture = TEXT("S3_Island");
 		break;
 	case EAIBEnding::DoubleSacrifice:
-		Headline = LOCTEXT("HDouble", "BOTH FINALISTS SACRIFICED THEMSELVES - THE ISLAND REMAINS UNCLAIMED");
+		Headline = LOCTEXT("HDouble", "Both finalists gave their lives. The island remains unclaimed.");
+		Picture = TEXT("S2_Fleets");
 		break;
 	case EAIBEnding::SoloSacrifice:
-		Headline = LOCTEXT("HSolo", "THE LAST CHAMPION SACRIFICED THEMSELVES - THE ISLAND REMAINS UNCLAIMED");
+		Headline = LOCTEXT("HSolo", "The last champion gave their life. The island remains unclaimed.");
+		Picture = TEXT("S2_Fleets");
 		break;
 	default:
-		Headline = LOCTEXT("HNone", "NO CHAMPION REMAINED");
+		Headline = LOCTEXT("HNone", "No champion remained to stand before the Guardian.");
+		Picture = TEXT("S1_DyingEarth");
 		break;
 	}
+	const FText Title = AIB::EndingTitle(G->Ending).IsEmpty() ? LOCTEXT("TheEnd", "THE END") : AIB::EndingTitle(G->Ending);
+	const FLinearColor PanelColor(0.012f, 0.012f, 0.016f, 0.97f);
+
+	// Header: the ending over its picture.
 	ResultsBox->AddSlot().AutoHeight()
 	[
-		SNew(STextBlock).Text(AIB::EndingTitle(G->Ending).IsEmpty() ? LOCTEXT("TheEnd", "THE END") : AIB::EndingTitle(G->Ending)).Font(AIBStyle::Title(64)).ColorAndOpacity(AIBStyle::Gold())
-	];
-	ResultsBox->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)
-	[
-		SNew(STextBlock).Text(Headline).Font(AIBStyle::Heading(22)).ColorAndOpacity(AIBStyle::Text()).AutoWrapText(true)
+		SNew(SBox)
+		.HeightOverride(230.f)
+		.Clipping(EWidgetClipping::ClipToBounds)
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot()
+			[
+				SNew(SScaleBox)
+				.Stretch(EStretch::ScaleToFill)
+				[
+					SNew(SImage).Image(AIBStyle::StoryImage(Picture))
+				]
+			]
+			+ SOverlay::Slot()
+			[
+				SNew(SAIBGradient).Colors({ FLinearColor(PanelColor.R, PanelColor.G, PanelColor.B, 0.15f), FLinearColor(PanelColor.R, PanelColor.G, PanelColor.B, 0.55f), PanelColor })
+			]
+			+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(30.f, 0.f, 30.f, 14.f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(STextBlock).Text(LOCTEXT("TrialsOver", "THE TRIALS ARE OVER")).Font(AIBStyle::SubHeading(16)).ColorAndOpacity(AIBStyle::TextDim())
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(STextBlock).Text(Title).Font(AIBStyle::Title(68)).ColorAndOpacity(AIBStyle::Gold()).ShadowOffset(FVector2D(2.f, 2.f)).ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.6f))
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(STextBlock).Text(Headline).Font(AIBStyle::BodyMedium(20)).ColorAndOpacity(AIBStyle::Text()).AutoWrapText(true)
+				]
+			]
+		]
 	];
 
-	// Leaderboard sections in the order the design asks for.
-	struct FSection { FText Title; TFunction<bool(const AAIBPlayerState*)> Filter; FLinearColor Color; };
-	const TArray<FSection> Sections =
+	// Leaderboard: how far each champion got, best first.
+	auto Rank = [](const AAIBPlayerState* PS)
 	{
-		{ LOCTEXT("SecChampion", "CHAMPION"), [](const AAIBPlayerState* PS) { return PS->Status == EAIBPlayerStatus::Champion; }, AIBStyle::Gold() },
-		{ LOCTEXT("SecSacrificed", "SACRIFICED THEMSELVES"), [](const AAIBPlayerState* PS) { return PS->Status == EAIBPlayerStatus::Sacrificed; }, AIBStyle::Ice() },
-		{ LOCTEXT("SecFinalist", "FINALIST"), [](const AAIBPlayerState* PS) { return PS->Status == EAIBPlayerStatus::Active; }, AIBStyle::Text() },
-		{ LOCTEXT("SecS2", "ELIMINATED IN STAGE 2"), [](const AAIBPlayerState* PS) { return PS->Status == EAIBPlayerStatus::Eliminated && PS->EliminatedInStage == 2; }, AIBStyle::TextDim() },
-		{ LOCTEXT("SecS1", "ELIMINATED IN STAGE 1"), [](const AAIBPlayerState* PS) { return PS->Status == EAIBPlayerStatus::Eliminated && PS->EliminatedInStage <= 1; }, AIBStyle::TextDim() },
-		{ LOCTEXT("SecForfeit", "FORFEITED"), [](const AAIBPlayerState* PS) { return PS->Status == EAIBPlayerStatus::Forfeited; }, AIBStyle::TextFaint() },
+		switch (PS->Status)
+		{
+		case EAIBPlayerStatus::Champion: return 0;
+		case EAIBPlayerStatus::Sacrificed: return 1;
+		case EAIBPlayerStatus::Active: return 2;
+		case EAIBPlayerStatus::Eliminated: return 5 - FMath::Clamp(PS->EliminatedInStage, 0, 2);
+		default: return 6;
+		}
 	};
+	TArray<AAIBPlayerState*> Players = G->GetSeatedPlayers();
+	Players.Sort([&Rank](const AAIBPlayerState& A, const AAIBPlayerState& B)
+	{
+		if (Rank(&A) != Rank(&B)) return Rank(&A) < Rank(&B);
+		if (A.Stage2Points != B.Stage2Points) return A.Stage2Points > B.Stage2Points;
+		return A.Stage1Wins > B.Stage1Wins;
+	});
 
 	auto Fate = [G](const AAIBPlayerState* PS) -> FText
 	{
-		const bool bChampionCommunity = PS->Slot == G->ChampionSlot;
-		switch (G->Ending)
+		switch (PS->Status)
 		{
-		case EAIBEnding::SacrificeThenKing:
-			if (bChampionCommunity) return LOCTEXT("FateClaims", "settles on the island");
-			if (PS->Status == EAIBPlayerStatus::Sacrificed) return LOCTEXT("FateEvac", "evacuated to safety");
-			break;
-		case EAIBEnding::DoubleSacrifice:
-		case EAIBEnding::SoloSacrifice:
-			if (PS->Status == EAIBPlayerStatus::Sacrificed) return LOCTEXT("FateEvac2", "evacuated to safety");
-			break;
-		case EAIBEnding::KingFirst:
-		case EAIBEnding::SoloKing:
-			if (bChampionCommunity) return LOCTEXT("FateAbandoned", "is lost - their champion rules alone");
-			break;
-		default:
-			break;
+		case EAIBPlayerStatus::Champion:
+			return G->Ending == EAIBEnding::SacrificeThenKing ? LOCTEXT("FateKingPeople", "Became King - their people settle the island") : LOCTEXT("FateKingAlone", "Became King - their people are lost");
+		case EAIBPlayerStatus::Sacrificed: return LOCTEXT("FateSacrificed", "Gave their life - their people are safe");
+		case EAIBPlayerStatus::Active: return LOCTEXT("FateFinalist", "Reached the Guardian");
+		case EAIBPlayerStatus::Eliminated: return PS->EliminatedInStage >= 2 ? LOCTEXT("FateOut2", "Out in Trial II - The Hidden Symbol") : LOCTEXT("FateOut1", "Out in Trial I - The Number Game");
+		default: return LOCTEXT("FateForfeit", "Left the trials");
 		}
-		return LOCTEXT("FateSea", "turned back to the burning sea");
+	};
+	auto FateColor = [](const AAIBPlayerState* PS)
+	{
+		switch (PS->Status)
+		{
+		case EAIBPlayerStatus::Champion: return AIBStyle::Gold();
+		case EAIBPlayerStatus::Sacrificed: return AIBStyle::Ice();
+		case EAIBPlayerStatus::Active: return AIBStyle::Text();
+		default: return AIBStyle::TextDim();
+		}
 	};
 
-	for (const FSection& Section : Sections)
+	TSharedRef<SVerticalBox> Table = SNew(SVerticalBox);
+	auto HeaderCell = [](const FText& Text) { return SNew(STextBlock).Text(Text).Font(AIBStyle::SubHeading(13)).ColorAndOpacity(AIBStyle::TextFaint()); };
+	Table->AddSlot().AutoHeight().Padding(14.f, 0.f, 14.f, 6.f)
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(84.f)[HeaderCell(LOCTEXT("ColRank", "#"))]]
+		+ SHorizontalBox::Slot().FillWidth(0.36f)[HeaderCell(LOCTEXT("ColChampion", "CHAMPION"))]
+		+ SHorizontalBox::Slot().FillWidth(0.4f)[HeaderCell(LOCTEXT("ColFate", "FATE"))]
+		+ SHorizontalBox::Slot().FillWidth(0.24f).HAlign(HAlign_Right)[HeaderCell(LOCTEXT("ColTrials", "WINS  /  POINTS  /  STONES"))]
+	];
+	for (int32 Index = 0; Index < Players.Num(); ++Index)
 	{
-		TArray<AAIBPlayerState*> Members = G->GetSeatedPlayers();
-		Members.RemoveAll([&Section](const AAIBPlayerState* PS) { return !Section.Filter(PS); });
-		if (Members.Num() == 0)
-		{
-			continue;
-		}
-		ResultsBox->AddSlot().AutoHeight().Padding(0.f, 8.f, 0.f, 4.f)[AIBUI::Header(Section.Title)];
-		for (const AAIBPlayerState* PS : Members)
-		{
-			ResultsBox->AddSlot().AutoHeight().Padding(0.f, 2.f)
+		const AAIBPlayerState* PS = Players[Index];
+		const bool bMe = PS == MyPS();
+		const FLinearColor Accent = FateColor(PS);
+		Table->AddSlot().AutoHeight().Padding(0.f, 3.f)
+		[
+			SNew(SBorder)
+			.BorderImage(bMe ? AIBStyle::OutlineBrush(AIBStyle::Gold() * FLinearColor(1.f, 1.f, 1.f, 0.5f), 8.f, 1.5f) : AIBStyle::CardBrush())
+			.BorderBackgroundColor(FLinearColor::White)
+			.Padding(FMargin(0.f))
 			[
 				SNew(SBorder)
 				.BorderImage(AIBStyle::CardBrush())
-				.Padding(FMargin(12.f, 8.f))
+				.Padding(FMargin(14.f, 8.f))
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SBox).WidthOverride(36.f)
+						[
+							SNew(STextBlock).Text(FText::AsNumber(Index + 1)).Font(AIBStyle::Title(34)).ColorAndOpacity(Index == 0 && PS->Status == EAIBPlayerStatus::Champion ? AIBStyle::Gold() : AIBStyle::TextDim())
+						]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f, 0.f)
 					[
 						SNew(SBox).WidthOverride(34.f).HeightOverride(34.f)
 						[
 							SNew(SImage).Image(AIBStyle::CrestBrush(PS->Slot)).ColorAndOpacity(PS->GetCommunityColor())
 						]
 					]
-					+ SHorizontalBox::Slot().FillWidth(0.38f).VAlign(VAlign_Center)
+					+ SHorizontalBox::Slot().FillWidth(0.36f).VAlign(VAlign_Center)
 					[
-						SNew(STextBlock).Text(FText::FromString(PS->GetPlayerName().ToUpper() + (PS == MyPS() ? TEXT("  (YOU)") : TEXT("")))).Font(AIBStyle::Heading(21)).ColorAndOpacity(Section.Color)
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text(FText::FromString(PS->GetPlayerName().ToUpper() + (bMe ? TEXT("  (YOU)") : TEXT("")) + (PS->bBot ? TEXT("  - AI") : TEXT(""))))
+							.Font(AIBStyle::Heading(21))
+							.ColorAndOpacity(PS->Status == EAIBPlayerStatus::Champion ? AIBStyle::Gold() : AIBStyle::Text())
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SNew(STextBlock).Text(PS->GetCommunityName()).Font(AIBStyle::Body(13)).ColorAndOpacity(PS->GetCommunityColor())
+						]
 					]
-					+ SHorizontalBox::Slot().FillWidth(0.62f).VAlign(VAlign_Center)
+					+ SHorizontalBox::Slot().FillWidth(0.4f).VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f, 0.f)
+					[
+						SNew(STextBlock).Text(Fate(PS)).Font(AIBStyle::BodyMedium(16)).ColorAndOpacity(Accent).AutoWrapText(true)
+					]
+					+ SHorizontalBox::Slot().FillWidth(0.24f).VAlign(VAlign_Center).HAlign(HAlign_Right)
 					[
 						SNew(STextBlock)
-						.Text(FText::Format(LOCTEXT("FateLine", "{0} {1}"), PS->GetCommunityName(), Fate(PS)))
-						.Font(AIBStyle::Body(16)).ColorAndOpacity(AIBStyle::TextDim())
+						.Text(FText::Format(LOCTEXT("StatsLine", "{0}   /   {1}   /   {2}"), PS->Stage1Wins, PS->Stage2Points, int32(FMath::CountBits64(uint64(PS->LoreFound)))))
+						.Font(AIBStyle::Heading(19))
+						.ColorAndOpacity(AIBStyle::TextDim())
 					]
 				]
-			];
-		}
+			]
+		];
 	}
+	ResultsBox->AddSlot().AutoHeight().Padding(30.f, 8.f, 30.f, 0.f)[Table];
+	ResultsBox->AddSlot().AutoHeight().Padding(44.f, 6.f, 30.f, 0.f)
+	[
+		SNew(STextBlock)
+		.Text(LOCTEXT("StatsLegend", "Wins: rounds won in the Number Game.   Points: correct Hidden Symbol guesses.   Stones: marker stones read on the island."))
+		.Font(AIBStyle::Body(12))
+		.ColorAndOpacity(AIBStyle::TextFaint())
+		.AutoWrapText(true)
+	];
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -42,6 +42,8 @@ namespace AIBStyle
 	ALICEINBOTHERLAND_API const FSlateBrush* Image(const FString& FileName, const FVector2D& Size = FVector2D(256.f, 256.f));
 	ALICEINBOTHERLAND_API const FSlateBrush* SuitBrush(EAIBSymbol Symbol, bool bGlow = false);
 	ALICEINBOTHERLAND_API const FSlateBrush* CrestBrush(int32 Community);
+	/** Story / trial illustration by id (e.g. "S3_Island"), 16:9; nullptr if missing. */
+	ALICEINBOTHERLAND_API const FSlateBrush* StoryImage(FName Id);
 
 	ALICEINBOTHERLAND_API FString UIRoot();
 

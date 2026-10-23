@@ -49,6 +49,9 @@ public:
 	void CloseChat();
 	bool IsChatOpen() const { return bChatOpen; }
 	void TogglePause();
+	/** Opens the settings panel straight away (lobby button); closing it returns to the game. */
+	void OpenSettings();
+	void OpenRules();
 	void SetScoreboardVisible(bool bVisible) { bScoreboard = bVisible; }
 	void OnChatMessage(const FAIBChatMessage& Message);
 	void RebuildChat();
@@ -76,10 +79,14 @@ private:
 	TSharedRef<SWidget> MakePauseMenu();
 	TSharedRef<SWidget> MakeLetterbox();
 	TSharedRef<SWidget> MakeSpectatorBar();
+	/** Narrated story (full screen) and the rules card shown while Alice explains a trial. */
+	TSharedRef<SWidget> MakeStoryLayer();
+	TSharedRef<SWidget> MakeRulesCard();
+	/** Island exploration: marker stones read and the read prompt. */
+	TSharedRef<SWidget> MakeExplorePanel();
 
 	// Stage panels (SAIBHudPanels.cpp)
 	TSharedRef<SWidget> MakeLobbyPanel();
-	TSharedRef<SWidget> MakeArrivalPanel();
 	TSharedRef<SWidget> MakeNumberPanel();
 	TSharedRef<SWidget> MakeNumberResults();
 	TSharedRef<SWidget> MakeSymbolPanel();
@@ -107,6 +114,7 @@ private:
 	bool bChatOpen = false;
 	bool bPauseOpen = false;
 	bool bSettingsOpen = false;
+	bool bSettingsOnly = false;
 	bool bRulesOpen = false;
 	bool bScoreboard = false;
 	float LastChatTime = -100.f;
@@ -114,5 +122,6 @@ private:
 	int32 BuiltSymbolSerial = -1;
 	int32 BuiltNumberSerial = -1;
 	int32 BuiltSymbolResultsSerial = -1;
-	int32 InviteNotice = 0;
+	float CopiedTime = -100.f;
+	bool bShowInternetCode = false;
 };

@@ -89,20 +89,7 @@ void AAIBMenuPlayerController::PlayerTick(float DeltaTime)
 	}
 	const float Time = GetWorld()->GetTimeSeconds();
 	FTransform Shot = MenuCamera->GetActorTransform();
-	if (PrologueAlpha >= 0.f)
-	{
-		// Prologue: sweep from the open sea, over the fleet, to the island and the Guardian's beam.
-		const float A = FMath::Clamp(PrologueAlpha, 0.f, 1.f);
-		const FVector P0(-40000.f, -260000.f, 9000.f);
-		const FVector P1(-36000.f, -140000.f, 2500.f);
-		const FVector P2(-20000.f, -60000.f, 6000.f);
-		const FVector P3(-2000.f, -20000.f, 9000.f);
-		const float U = 1.f - A;
-		const FVector Loc = U * U * U * P0 + 3.f * U * U * A * P1 + 3.f * U * A * A * P2 + A * A * A * P3;
-		const FVector Look = FMath::Lerp(FVector(-30000.f, -60000.f, 1000.f), FVector(30000.f, 33000.f, 2500.f), FMath::SmoothStep(0.f, 1.f, A));
-		Shot = FTransform((Look - Loc).Rotation(), Loc);
-	}
-	else if (AAIBFleet* Fleet = WorldSys->GetFleet())
+	if (AAIBFleet* Fleet = WorldSys->GetFleet())
 	{
 		Shot = Fleet->GetLobbyCamera(Time);
 	}

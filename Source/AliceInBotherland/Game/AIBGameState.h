@@ -47,6 +47,17 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	bool bMatchInProgress = false;
 
+	/** Room code for friends on the same network (host's LAN address) and for internet play (public address). */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	FString RoomCode;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	FString RoomCodeInternet;
+
+	/** Host's test/showcase mode: empty seats are kept filled with AI champions. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	bool bAITestMode = false;
+
 	/** Seed shared with clients for deterministic cosmetic randomness (ship sway etc). */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	int32 MatchSeed = 0;

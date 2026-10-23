@@ -27,14 +27,17 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 private:
-	TSharedRef<SWidget> MakeSlider(const FText& Label, float FAIBSettings::* Field, float Min, float Max, bool bPercent);
+	enum class EFormat : uint8 { Percent, Value, Degrees };
+	TSharedRef<SWidget> MakeSlider(const FText& Label, float FAIBSettings::* Field, float Min, float Max, EFormat Format);
 	TSharedRef<SWidget> MakeToggle(const FText& Label, bool FAIBSettings::* Field);
-	TSharedRef<SWidget> MakeQualityRow();
+	TSharedRef<SWidget> MakeChoiceRow(const FText& Label, int32 FAIBSettings::* Field, TArray<FText> Names);
 	void Commit(bool bSave);
 
 	TWeakObjectPtr<UAIBGameInstance> GameInstance;
 	FAIBSettings Working;
 	FSimpleDelegate OnClose;
+	double LastTick = -1.0;
 };

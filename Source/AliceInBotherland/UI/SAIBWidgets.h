@@ -84,6 +84,28 @@ private:
 	float Size = 96.f;
 };
 
+/** Smooth colour ramp (evenly spaced stops), used to shade pictures behind text. */
+class ALICEINBOTHERLAND_API SAIBGradient : public SLeafWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SAIBGradient)
+		: _Vertical(true)
+	{}
+		SLATE_ARGUMENT(TArray<FLinearColor>, Colors)
+		/** True: the stops run top to bottom. False: left to right. */
+		SLATE_ARGUMENT(bool, Vertical)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs);
+
+	virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+	virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(8.f, 8.f); }
+
+private:
+	TArray<FLinearColor> Colors;
+	bool bVertical = true;
+};
+
 namespace AIBUI
 {
 	/** Glass panel with padding. */
@@ -92,6 +114,8 @@ namespace AIBUI
 	/** Small all-caps section header with a red tick. */
 	ALICEINBOTHERLAND_API TSharedRef<SWidget> Header(const FText& Text);
 	ALICEINBOTHERLAND_API TSharedRef<SWidget> Divider();
+	/** Small pulsing green dot shown while a player's microphone is sending. */
+	ALICEINBOTHERLAND_API TSharedRef<SWidget> TalkDot(const TAttribute<bool>& bTalking, float Size = 10.f);
 	/** Horizontal progress bar. */
 	ALICEINBOTHERLAND_API TSharedRef<SWidget> Bar(const TAttribute<float>& Fraction, const TAttribute<FLinearColor>& Color, float Height = 6.f);
 }

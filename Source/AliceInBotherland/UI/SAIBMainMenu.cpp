@@ -1,15 +1,17 @@
-// Alice in Botherland - main menu, prologue, lobby browser, hall of champions
+// Alice in Botherland - main menu: champion profile, rooms, the story, hall of champions
 
 #include "UI/SAIBMainMenu.h"
 #include "UI/AIBStyle.h"
 #include "UI/SAIBWidgets.h"
 #include "UI/SAIBHud.h"
 #include "UI/SAIBLoadingScreen.h"
+#include "UI/SAIBStoryCards.h"
 #include "Game/AIBMenuGameMode.h"
 #include "Core/AIBGameInstance.h"
-#include "Core/AIBAssets.h"
 #include "Audio/AIBAudioSubsystem.h"
+#include "Audio/AIBNarration.h"
 #include "Online/AIBSessionSubsystem.h"
+#include "Online/AIBRoomCode.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
@@ -18,13 +20,40 @@
 #include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Input/SCheckBox.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/FileHelper.h"
-#include "Sound/SoundBase.h"
 #include "Engine/World.h"
 
 #define LOCTEXT_NAMESPACE "AIBMainMenu"
+
+namespace
+{
+	const FText& MonthName(int32 Month)
+	{
+		static const FText Names[] =
+		{
+			LOCTEXT("Jan", "JANUARY"), LOCTEXT("Feb", "FEBRUARY"), LOCTEXT("Mar", "MARCH"), LOCTEXT("Apr", "APRIL"),
+			LOCTEXT("May", "MAY"), LOCTEXT("Jun", "JUNE"), LOCTEXT("Jul", "JULY"), LOCTEXT("Aug", "AUGUST"),
+			LOCTEXT("Sep", "SEPTEMBER"), LOCTEXT("Oct", "OCTOBER"), LOCTEXT("Nov", "NOVEMBER"), LOCTEXT("Dec", "DECEMBER")
+		};
+		return Names[FMath::Clamp(Month, 1, 12) - 1];
+	}
+
+	/** Keeps letters, digits, spaces, '-' and '_' (the name travels in a URL and shows over heads). */
+	FString CleanName(const FString& In)
+	{
+		FString Out;
+		for (const TCHAR C : In)
+		{
+			if (FChar::IsAlnum(C) || C == TEXT(' ') || C == TEXT('-') || C == TEXT('_'))
+			{
+				Out.AppendChar(C);
+			}
+		}
+		return Out.TrimStartAndEnd().Left(16);
+	}
+}
 
 UAIBGameInstance* SAIBMainMenu::GI() const
 {
@@ -39,7 +68,6 @@ UAIBSessionSubsystem* SAIBMainMenu::Sessions() const
 void SAIBMainMenu::Construct(const FArguments& InArgs)
 {
 	Owner = InArgs._Owner;
-	PrologueLines = { TEXT("VO_Prologue_01"), TEXT("VO_Prologue_02"), TEXT("VO_Prologue_03"), TEXT("VO_Prologue_04"), TEXT("VO_Prologue_05"), TEXT("VO_Prologue_06") };
 	if (UAIBGameInstance* Inst = GI())
 	{
 		MenuMessage = Inst->PendingMenuMessage;
@@ -61,6 +89,7 @@ void SAIBMainMenu::Construct(const FArguments& InArgs)
 			.Image(Vignette)
 		]
 		+ SOverlay::Slot()[PageBox(EPage::Home, MakeHome())]
+		+ SOverlay::Slot()[PageBox(EPage::Profile, MakeProfile())]
 		+ SOverlay::Slot()[PageBox(EPage::Join, MakeJoin())]
 		+ SOverlay::Slot()
 		[
@@ -70,7 +99,7 @@ void SAIBMainMenu::Construct(const FArguments& InArgs)
 					SNew(SAIBSettingsPanel).GameInstance(GI()).OnClose_Lambda([this]() { Go(EPage::Home); })
 				])
 		]
-		+ SOverlay::Slot()[PageBox(EPage::Prologue, MakePrologue())]
+		+ SOverlay::Slot()[PageBox(EPage::Story, MakeStory())]
 		+ SOverlay::Slot()[PageBox(EPage::HowTo, MakeHowTo())]
 		+ SOverlay::Slot()[PageBox(EPage::Hall, MakeHall())]
 		+ SOverlay::Slot()[PageBox(EPage::Credits, MakeCredits())]
@@ -95,10 +124,47 @@ void SAIBMainMenu::Construct(const FArguments& InArgs)
 		return;
 	}
 
-	UAIBGameInstance* Inst = GI();
-	if (Inst && !Inst->GetProfile()->bSeenPrologue)
+	// -JoinCode=XXXX-XXX (e.g. on a shortcut a friend made) joins that room straight away, once per launch.
+	static bool bJoinCodeUsed = false;
+	FString CodeArg;
+	if (!bJoinCodeUsed && FParse::Value(FCommandLine::Get(), TEXT("JoinCode="), CodeArg) && Sessions())
 	{
-		StartPrologue();
+		bJoinCodeUsed = true;
+		// Show the join page, so a code that doesn't work leaves its message on screen.
+		Go(EPage::Join);
+		RoomCode = CodeArg.ToUpper();
+		if (CodeBox.IsValid())
+		{
+			CodeBox->SetText(FText::FromString(RoomCode));
+		}
+		JoinWithCode();
+		return;
+	}
+
+#if !UE_BUILD_SHIPPING
+	// Development: -AIBMenuPage=home|join|story|settings|howto|hall opens that page (UI screenshots).
+	FString PageArg;
+	if (FParse::Value(FCommandLine::Get(), TEXT("AIBMenuPage="), PageArg))
+	{
+		const TMap<FString, EPage> Pages = { { TEXT("home"), EPage::Home }, { TEXT("join"), EPage::Join }, { TEXT("settings"), EPage::Settings },
+			{ TEXT("howto"), EPage::HowTo }, { TEXT("hall"), EPage::Hall }, { TEXT("profile"), EPage::Profile } };
+		if (PageArg.ToLower() == TEXT("story"))
+		{
+			StartStory();
+		}
+		else if (const EPage* Page = Pages.Find(PageArg.ToLower()))
+		{
+			Go(*Page);
+		}
+		return;
+	}
+#endif
+
+	// First launch: who is this champion?
+	UAIBGameInstance* Inst = GI();
+	if (Inst && !Inst->GetProfile()->bProfileComplete)
+	{
+		Go(EPage::Profile);
 	}
 }
 
@@ -113,15 +179,44 @@ TSharedRef<SWidget> SAIBMainMenu::PageBox(EPage Page, TSharedRef<SWidget> Conten
 
 void SAIBMainMenu::Go(EPage Page)
 {
-	if (Current == EPage::Prologue && Page != EPage::Prologue)
+	if (Current == EPage::Story && Page != EPage::Story)
 	{
-		StopPrologue();
+		StopStory();
 	}
 	Current = Page;
-	if (Page == EPage::Join && Sessions())
+	if (Page == EPage::Join)
 	{
-		Sessions()->FindLobbies(bLanSearch);
-		ShownResults = -1;
+		JoinError = FText::GetEmpty();
+		if (Sessions())
+		{
+			Sessions()->FindLobbies(true);
+			ShownResults = -1;
+		}
+		if (CodeBox.IsValid())
+		{
+			FSlateApplication::Get().SetKeyboardFocus(CodeBox, EFocusCause::SetDirectly);
+		}
+	}
+	if (Page == EPage::Profile)
+	{
+		// Start the form from what is saved.
+		if (const UAIBGameInstance* Inst = GI())
+		{
+			const UAIBSaveGame* P = const_cast<UAIBGameInstance*>(Inst)->GetProfile();
+			DraftName = P->Settings.PlayerName;
+			DraftDay = P->BirthDay > 0 ? P->BirthDay : 1;
+			DraftMonth = P->BirthMonth > 0 ? P->BirthMonth : 1;
+			DraftYear = P->BirthYear > 0 ? P->BirthYear : 2000;
+			bProfileTouched = P->bProfileComplete;
+			if (NameBox.IsValid())
+			{
+				NameBox->SetText(FText::FromString(DraftName));
+			}
+		}
+		if (NameBox.IsValid())
+		{
+			FSlateApplication::Get().SetKeyboardFocus(NameBox, EFocusCause::SetDirectly);
+		}
 	}
 	if (Page == EPage::Hall)
 	{
@@ -131,13 +226,11 @@ void SAIBMainMenu::Go(EPage Page)
 
 FReply SAIBMainMenu::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::SpaceBar)
+	const bool bFirstProfile = Current == EPage::Profile && GI() && !GI()->GetProfile()->bProfileComplete;
+	if ((InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::SpaceBar) && Current != EPage::Home && !bFirstProfile)
 	{
-		if (Current != EPage::Home)
-		{
-			Go(EPage::Home);
-			return FReply::Handled();
-		}
+		Go(EPage::Home);
+		return FReply::Handled();
 	}
 	return FReply::Unhandled();
 }
@@ -154,15 +247,15 @@ TSharedRef<SWidget> SAIBMainMenu::MakeHome()
 			.Text(Text)
 			.SubText(Sub)
 			.Kind(Kind)
-			.FontSize(24)
-			.Height(Sub.IsEmpty() ? 50.f : 62.f)
+			.FontSize(Sub.IsEmpty() ? 20 : 24)
+			.Height(Sub.IsEmpty() ? 46.f : 62.f)
 			.OnClicked_Lambda([Action]() { Action(); return FReply::Handled(); });
 	};
 
 	return SNew(SOverlay)
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(90.f, 40.f, 0.f, 40.f)
 		[
-			SNew(SBox).WidthOverride(580.f)
+			SNew(SBox).WidthOverride(560.f)
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
@@ -175,59 +268,73 @@ TSharedRef<SWidget> SAIBMainMenu::MakeHome()
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(4.f, -10.f, 0.f, 6.f)
 				[
-					SNew(STextBlock).Text(LOCTEXT("Subtitle", "THE  LAST  ISLAND")).Font(AIBStyle::StoryBold(26)).ColorAndOpacity(AIBStyle::Blood())
+					SNew(STextBlock).Text(LOCTEXT("Subtitle", "THE  LAST  ISLAND")).Font(AIBStyle::StoryBold(26)).ColorAndOpacity(AIBStyle::Gold())
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(4.f, 0.f, 0.f, 28.f)
+				+ SVerticalBox::Slot().AutoHeight().Padding(4.f, 0.f, 0.f, 20.f)
 				[
 					SNew(STextBlock)
 					.Text(LOCTEXT("Tagline", "Five communities. Three trials. One island. And a choice no champion is ready to make."))
 					.Font(AIBStyle::Story(16)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 16.f)
+				// Who is playing.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)
 				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)
+					SNew(SBorder)
+					.BorderImage(AIBStyle::CardBrush())
+					.Padding(FMargin(16.f, 8.f, 8.f, 8.f))
 					[
-						SNew(STextBlock).Text(LOCTEXT("ChampionName", "CHAMPION NAME")).Font(AIBStyle::SubHeading(16)).ColorAndOpacity(AIBStyle::TextDim())
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.f)
-					[
-						SNew(SEditableTextBox)
-						.Font(AIBStyle::Heading(20))
-						.Text_Lambda([this]() { return FText::FromString(GI() ? GI()->GetSettings().PlayerName : FString()); })
-						.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type)
-						{
-							if (UAIBGameInstance* Inst = GI())
-							{
-								FAIBSettings Settings = Inst->GetSettings();
-								Settings.PlayerName = Text.ToString().Left(16).TrimStartAndEnd();
-								if (!Settings.PlayerName.IsEmpty())
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								SNew(STextBlock).Text(LOCTEXT("PlayingAs", "CHAMPION")).Font(AIBStyle::SubHeading(13)).ColorAndOpacity(AIBStyle::TextDim())
+							]
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								SNew(STextBlock)
+								.Font(AIBStyle::Heading(24))
+								.ColorAndOpacity(AIBStyle::Text())
+								.Text_Lambda([this]()
 								{
-									Inst->SetSettings(Settings);
-								}
-							}
-						})
+									UAIBGameInstance* Inst = GI();
+									if (!Inst)
+									{
+										return FText::GetEmpty();
+									}
+									const int32 Age = Inst->GetProfile()->GetAge();
+									const FText Name = FText::FromString(Inst->GetSettings().PlayerName.ToUpper());
+									return Age >= 0 ? FText::Format(LOCTEXT("NameAge", "{0}   -   AGE {1}"), Name, Age) : Name;
+								})
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(SAIBButton).Text(LOCTEXT("EditProfile", "EDIT")).Kind(EAIBButtonKind::Ghost).FontSize(16).Height(36.f)
+							.OnClicked_Lambda([this]() { Go(EPage::Profile); return FReply::Handled(); })
+						]
 					]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
 				[
-					Button(LOCTEXT("PlaySolo", "PLAY  -  SOLO VS AI"), LOCTEXT("PlaySoloSub", "You and four AI champions"), EAIBButtonKind::Primary,
-						[this]() { if (Sessions()) Sessions()->HostLobby(true, 4); })
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
-				[
-					Button(LOCTEXT("Host", "HOST A LOBBY"), LOCTEXT("HostSub", "Invite up to four friends - empty seats can be AI"), EAIBButtonKind::Secondary,
+					Button(LOCTEXT("Create", "CREATE ROOM"), LOCTEXT("CreateSub", "Get a room code and bring four friends"), EAIBButtonKind::Primary,
 						[this]() { if (Sessions()) Sessions()->HostLobby(false, 0); })
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
 				[
-					Button(LOCTEXT("Join", "JOIN A LOBBY"), LOCTEXT("JoinSub", "Browse lobbies or connect by address"), EAIBButtonKind::Secondary,
+					Button(LOCTEXT("JoinRoom", "JOIN ROOM"), LOCTEXT("JoinRoomSub", "Type a friend's room code"), EAIBButtonKind::Secondary,
 						[this]() { Go(EPage::Join); })
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 0.f)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
+				[
+					Button(LOCTEXT("PlaySolo", "PLAY VS AI"), LOCTEXT("PlaySoloSub", "You and four AI champions"), EAIBButtonKind::Secondary,
+						[this]() { if (Sessions()) Sessions()->HostLobby(true, 4); })
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f, 0.f, 0.f)
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)[Button(LOCTEXT("Prologue", "PROLOGUE"), FText::GetEmpty(), EAIBButtonKind::Secondary, [this]() { StartPrologue(); })]
+					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)[Button(LOCTEXT("Story", "THE STORY"), FText::GetEmpty(), EAIBButtonKind::Secondary, [this]() { StartStory(); })]
 					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(4.f, 0.f, 0.f, 0.f)[Button(LOCTEXT("HowTo", "HOW TO PLAY"), FText::GetEmpty(), EAIBButtonKind::Secondary, [this]() { Go(EPage::HowTo); })]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f, 0.f, 0.f)
@@ -258,18 +365,225 @@ TSharedRef<SWidget> SAIBMainMenu::MakeHome()
 			SNew(STextBlock)
 			.Font(AIBStyle::Body(13))
 			.ColorAndOpacity(AIBStyle::TextFaint())
-			.Text_Lambda([this]()
-			{
-				const FString Platform = Sessions() ? Sessions()->GetPlatformName() : TEXT("?");
-				return FText::Format(LOCTEXT("Footer", "v1.0.1  -  online: {0}  -  {1}"), FText::FromString(Platform),
-					Sessions() && Sessions()->HasOnlinePlatform() ? LOCTEXT("SteamOn", "friend invites available") : LOCTEXT("SteamOff", "start Steam for friend invites; LAN / direct IP always works"));
-			})
+			.Text(LOCTEXT("Footer", "v1.1.0   -   rooms work on your local network; internet play needs UDP port 7777 forwarded on the host's router"))
+		];
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------------------------------------------------
+
+TSharedRef<SWidget> SAIBMainMenu::MakeStepper(const FText& Label, TAttribute<FText> Value, TFunction<void(int32)> Step, float Width)
+{
+	auto Arrow = [Step](const TCHAR* Glyph, int32 Delta)
+	{
+		return SNew(SAIBButton)
+			.Text(FText::FromString(Glyph))
+			.Kind(EAIBButtonKind::Secondary)
+			.FontSize(22)
+			.Height(52.f)
+			.OnClicked_Lambda([Step, Delta]() { Step(Delta); return FReply::Handled(); });
+	};
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f)
+		[
+			SNew(STextBlock).Text(Label).Font(AIBStyle::SubHeading(14)).ColorAndOpacity(AIBStyle::TextDim())
+		]
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth()[Arrow(TEXT("<"), -1)]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(Width).HAlign(HAlign_Center)
+				[
+					SNew(STextBlock).Text(Value).Font(AIBStyle::Heading(26)).ColorAndOpacity(AIBStyle::Text())
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth()[Arrow(TEXT(">"), 1)]
+		];
+}
+
+FText SAIBMainMenu::ProfileProblem() const
+{
+	const FString Name = CleanName(DraftName);
+	if (Name.Len() < 2)
+	{
+		return LOCTEXT("NameShort", "Your champion name needs at least 2 letters.");
+	}
+	const FDateTime Now = FDateTime::Now();
+	if (DraftYear > Now.GetYear() || (DraftYear == Now.GetYear() && (DraftMonth > Now.GetMonth() || (DraftMonth == Now.GetMonth() && DraftDay > Now.GetDay()))))
+	{
+		return LOCTEXT("DobFuture", "That date of birth is in the future.");
+	}
+	return FText::GetEmpty();
+}
+
+void SAIBMainMenu::SaveProfile()
+{
+	UAIBGameInstance* Inst = GI();
+	if (!Inst || !ProfileProblem().IsEmpty())
+	{
+		bProfileTouched = true;
+		AIBStyle::PlayUISound(TEXT("SFX_Wrong"));
+		return;
+	}
+	UAIBSaveGame* P = Inst->GetProfile();
+	P->BirthDay = DraftDay;
+	P->BirthMonth = DraftMonth;
+	P->BirthYear = DraftYear;
+	P->bProfileComplete = true;
+	FAIBSettings Settings = Inst->GetSettings();
+	Settings.PlayerName = CleanName(DraftName);
+	Inst->SetSettings(Settings);
+	Inst->SaveProfile();
+	Go(EPage::Home);
+}
+
+TSharedRef<SWidget> SAIBMainMenu::MakeProfile()
+{
+	auto ClampDay = [this]() { DraftDay = FMath::Clamp(DraftDay, 1, FDateTime::DaysInMonth(DraftYear, DraftMonth)); };
+	const int32 ThisYear = FDateTime::Now().GetYear();
+	return SNew(SBox)
+		.HAlign(HAlign_Center)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SBox).WidthOverride(760.f)
+			[
+				AIBUI::Panel(
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(STextBlock).Text(LOCTEXT("ProfileTitle", "WHO ARE YOU, CHAMPION?")).Font(AIBStyle::Title(54)).ColorAndOpacity(AIBStyle::Text())
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 22.f)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("ProfileSub", "Your community has chosen you. Tell the island your name."))
+						.Font(AIBStyle::Story(16)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f)
+					[
+						SNew(STextBlock).Text(LOCTEXT("NameLabel", "CHAMPION NAME")).Font(AIBStyle::SubHeading(14)).ColorAndOpacity(AIBStyle::TextDim())
+					]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SAssignNew(NameBox, SEditableTextBox)
+						.Font(AIBStyle::Heading(28))
+						.HintText(LOCTEXT("NameHint", "Type your name"))
+						.Text(FText::FromString(DraftName))
+						.OnTextChanged_Lambda([this](const FText& Text) { DraftName = Text.ToString().Left(16); })
+						.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type Commit) { DraftName = Text.ToString().Left(16); if (Commit == ETextCommit::OnEnter) SaveProfile(); })
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f, 0.f, 0.f)
+					[
+						SNew(STextBlock).Text(LOCTEXT("NameRules", "2 to 16 letters or numbers. The other champions see this name.")).Font(AIBStyle::Body(13)).ColorAndOpacity(AIBStyle::TextFaint())
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 22.f, 0.f, 8.f)
+					[
+						AIBUI::Header(LOCTEXT("DobHeader", "DATE OF BIRTH"))
+					]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 18.f, 0.f)
+						[
+							MakeStepper(LOCTEXT("Day", "DAY"), TAttribute<FText>::CreateLambda([this]() { return FText::AsNumber(DraftDay); }),
+								[this](int32 Delta)
+								{
+									const int32 Days = FDateTime::DaysInMonth(DraftYear, DraftMonth);
+									DraftDay = (DraftDay - 1 + Delta + Days) % Days + 1;
+									bProfileTouched = true;
+								}, 60.f)
+						]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 18.f, 0.f)
+						[
+							MakeStepper(LOCTEXT("Month", "MONTH"), TAttribute<FText>::CreateLambda([this]() { return MonthName(DraftMonth); }),
+								[this, ClampDay](int32 Delta)
+								{
+									DraftMonth = (DraftMonth - 1 + Delta + 12) % 12 + 1;
+									ClampDay();
+									bProfileTouched = true;
+								}, 170.f)
+						]
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							MakeStepper(LOCTEXT("Year", "YEAR"), TAttribute<FText>::CreateLambda([this]() { return FText::FromString(FString::FromInt(DraftYear)); }),
+								[this, ClampDay, ThisYear](int32 Delta)
+								{
+									DraftYear = FMath::Clamp(DraftYear + Delta, 1920, ThisYear);
+									ClampDay();
+									bProfileTouched = true;
+								}, 90.f)
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f, 0.f, 0.f)
+					[
+						SNew(STextBlock)
+						.Font(AIBStyle::BodyMedium(16))
+						.Text_Lambda([this]()
+						{
+							const FText Problem = ProfileProblem();
+							if (bProfileTouched && !Problem.IsEmpty())
+							{
+								return Problem;
+							}
+							const FDateTime Now = FDateTime::Now();
+							int32 Age = Now.GetYear() - DraftYear;
+							if (Now.GetMonth() < DraftMonth || (Now.GetMonth() == DraftMonth && Now.GetDay() < DraftDay))
+							{
+								--Age;
+							}
+							return FText::Format(LOCTEXT("AgeLine", "Age {0}. Your date of birth stays on this PC."), FMath::Max(0, Age));
+						})
+						.ColorAndOpacity_Lambda([this]() { return FSlateColor(bProfileTouched && !ProfileProblem().IsEmpty() ? AIBStyle::Blood() : AIBStyle::TextDim()); })
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 22.f, 0.f, 0.f)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f)
+						[
+							SNew(SAIBButton)
+							.Text(LOCTEXT("ProfileBack", "BACK"))
+							.Kind(EAIBButtonKind::Ghost)
+							.Visibility_Lambda([this]() { return GI() && GI()->GetProfile()->bProfileComplete ? EVisibility::Visible : EVisibility::Hidden; })
+							.OnClicked_Lambda([this]() { Go(EPage::Home); return FReply::Handled(); })
+						]
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							SNew(SAIBButton)
+							.Text(LOCTEXT("ProfileContinue", "CONTINUE"))
+							.Kind(EAIBButtonKind::Primary)
+							.MinWidth(220.f)
+							.FontSize(24)
+							.Height(58.f)
+							.OnClicked_Lambda([this]() { SaveProfile(); return FReply::Handled(); })
+						]
+					],
+					FMargin(36.f), true)
+			]
 		];
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Join
 // ---------------------------------------------------------------------------------------------------------------------
+
+void SAIBMainMenu::JoinWithCode()
+{
+	FString Address;
+	if (!AIBRoomCode::ToAddress(RoomCode, Address))
+	{
+		JoinError = LOCTEXT("BadCode", "That doesn't look like a room code. It has 7 letters and numbers, like 6C2M-9QZ.");
+		AIBStyle::PlayUISound(TEXT("SFX_Wrong"));
+		return;
+	}
+	JoinError = FText::GetEmpty();
+	if (Sessions())
+	{
+		Sessions()->JoinByAddress(Address);
+	}
+}
 
 TSharedRef<SWidget> SAIBMainMenu::MakeJoin()
 {
@@ -284,63 +598,89 @@ TSharedRef<SWidget> SAIBMainMenu::MakeJoin()
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()
 					[
-						SNew(STextBlock).Text(LOCTEXT("JoinTitle", "JOIN A LOBBY")).Font(AIBStyle::Title(52)).ColorAndOpacity(AIBStyle::Text())
+						SNew(STextBlock).Text(LOCTEXT("JoinTitle", "JOIN A ROOM")).Font(AIBStyle::Title(54)).ColorAndOpacity(AIBStyle::Text())
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)
 					[
-						SNew(STextBlock).Font(AIBStyle::Body(15)).ColorAndOpacity(AIBStyle::Gold())
-						.Text_Lambda([this]() { return Sessions() ? Sessions()->GetStatus() : FText::GetEmpty(); })
+						SNew(STextBlock)
+						.Text(LOCTEXT("JoinSub", "Ask the host for their room code (it is shown in their room), then type it here."))
+						.Font(AIBStyle::Body(16)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f, 0.f)
+						[
+							SAssignNew(CodeBox, SEditableTextBox)
+							.Font(AIBStyle::Title(46))
+							.HintText(LOCTEXT("CodeHint", "ROOM CODE"))
+							.OnTextChanged_Lambda([this](const FText& Text) { RoomCode = Text.ToString().ToUpper(); JoinError = FText::GetEmpty(); })
+							.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type Commit)
+							{
+								RoomCode = Text.ToString().ToUpper();
+								if (Commit == ETextCommit::OnEnter)
+								{
+									JoinWithCode();
+								}
+							})
+						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
-							SNew(SCheckBox)
-							.IsChecked_Lambda([this]() { return bLanSearch ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-							.OnCheckStateChanged_Lambda([this](ECheckBoxState State) { bLanSearch = State == ECheckBoxState::Checked; })
-						]
-						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(8.f, 0.f)
-						[
-							SNew(STextBlock).Text(LOCTEXT("LanOnly", "Search my local network (LAN)")).Font(AIBStyle::Body(16)).ColorAndOpacity(AIBStyle::Text())
-						]
-						+ SHorizontalBox::Slot().AutoWidth()
-						[
-							SNew(SAIBButton).Text(LOCTEXT("Refresh", "REFRESH")).FontSize(18).Height(42.f)
-							.IsEnabled_Lambda([this]() { return Sessions() && !Sessions()->IsSearching(); })
-							.OnClicked_Lambda([this]() { if (Sessions()) Sessions()->FindLobbies(bLanSearch); ShownResults = -1; return FReply::Handled(); })
+							SNew(SAIBButton).Kind(EAIBButtonKind::Primary).Text(LOCTEXT("JoinCode", "JOIN")).FontSize(26).MinWidth(160.f).Height(64.f)
+							.IsEnabled_Lambda([this]() { return !RoomCode.TrimStartAndEnd().IsEmpty(); })
+							.OnClicked_Lambda([this]() { JoinWithCode(); return FReply::Handled(); })
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f)
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f, 0.f, 0.f)
 					[
-						SNew(SBox).HeightOverride(300.f)
+						SNew(STextBlock)
+						.Font(AIBStyle::BodyMedium(15))
+						.AutoWrapText(true)
+						.Text_Lambda([this]() { return !JoinError.IsEmpty() ? JoinError : (Sessions() ? Sessions()->GetStatus() : FText::GetEmpty()); })
+						.ColorAndOpacity_Lambda([this]() { return FSlateColor(!JoinError.IsEmpty() ? AIBStyle::Blood() : AIBStyle::Gold()); })
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 20.f, 0.f, 6.f)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[AIBUI::Header(LOCTEXT("NearbyRooms", "ROOMS ON YOUR NETWORK"))]
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							SNew(SAIBButton).Text(LOCTEXT("Refresh", "REFRESH")).Kind(EAIBButtonKind::Ghost).FontSize(15).Height(32.f)
+							.IsEnabled_Lambda([this]() { return Sessions() && !Sessions()->IsSearching(); })
+							.OnClicked_Lambda([this]() { if (Sessions()) Sessions()->FindLobbies(true); ShownResults = -1; return FReply::Handled(); })
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SBox).MaxDesiredHeight(220.f)
 						[
 							SNew(SScrollBox) + SScrollBox::Slot()[LobbyList.ToSharedRef()]
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("Direct", "OR CONNECT DIRECTLY"))]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 16.f, 0.f, 6.f)[AIBUI::Header(LOCTEXT("Direct", "OR CONNECT BY IP ADDRESS"))]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)
 						[
 							SNew(SEditableTextBox)
-							.Font(AIBStyle::Body(18))
-							.HintText(LOCTEXT("AddrHint", "Host address, e.g. 192.168.1.20 or 203.0.113.5:7777"))
+							.Font(AIBStyle::Body(17))
+							.HintText(LOCTEXT("AddrHint", "e.g. 192.168.1.20 or 203.0.113.5:7777"))
 							.OnTextChanged_Lambda([this](const FText& Text) { DirectAddress = Text.ToString(); })
 						]
 						+ SHorizontalBox::Slot().AutoWidth()
 						[
-							SNew(SAIBButton).Kind(EAIBButtonKind::Primary).Text(LOCTEXT("Connect", "CONNECT")).FontSize(18).Height(44.f)
+							SNew(SAIBButton).Text(LOCTEXT("Connect", "CONNECT")).FontSize(17).Height(42.f)
+							.IsEnabled_Lambda([this]() { return !DirectAddress.TrimStartAndEnd().IsEmpty(); })
 							.OnClicked_Lambda([this]() { if (Sessions()) Sessions()->JoinByAddress(DirectAddress); return FReply::Handled(); })
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 16.f, 0.f, 0.f).HAlign(HAlign_Right)
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f, 0.f, 0.f).HAlign(HAlign_Right)
 					[
 						SNew(SAIBButton).Text(LOCTEXT("Back", "BACK")).MinWidth(160.f)
 						.OnClicked_Lambda([this]() { Go(EPage::Home); return FReply::Handled(); })
 					],
-					FMargin(32.f), true)
+					FMargin(34.f), true)
 			]
 		];
 }
@@ -355,11 +695,11 @@ void SAIBMainMenu::RebuildLobbyList()
 	const TArray<FAIBLobbyInfo>& Results = Sessions()->GetResults();
 	if (Results.Num() == 0)
 	{
-		LobbyList->AddSlot().AutoHeight().Padding(0.f, 20.f)
+		LobbyList->AddSlot().AutoHeight().Padding(0.f, 8.f)
 		[
 			SNew(STextBlock)
-			.Text(Sessions()->IsSearching() ? LOCTEXT("SearchingList", "Searching...") : LOCTEXT("NoLobbies", "No lobbies found yet."))
-			.Font(AIBStyle::Body(16)).ColorAndOpacity(AIBStyle::TextDim())
+			.Text(Sessions()->IsSearching() ? LOCTEXT("SearchingList", "Looking for rooms nearby...") : LOCTEXT("NoLobbies", "No rooms found on this network. Use the room code instead."))
+			.Font(AIBStyle::Body(15)).ColorAndOpacity(AIBStyle::TextDim())
 		];
 		return;
 	}
@@ -375,7 +715,7 @@ void SAIBMainMenu::RebuildLobbyList()
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 				[
-					SNew(STextBlock).Text(FText::Format(LOCTEXT("LobbyOf", "{0}'s lobby"), FText::FromString(Info.HostName))).Font(AIBStyle::Heading(20)).ColorAndOpacity(AIBStyle::Text())
+					SNew(STextBlock).Text(FText::Format(LOCTEXT("LobbyOf", "{0}'s room"), FText::FromString(Info.HostName))).Font(AIBStyle::Heading(20)).ColorAndOpacity(AIBStyle::Text())
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(16.f, 0.f)
 				[
@@ -392,58 +732,31 @@ void SAIBMainMenu::RebuildLobbyList()
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Prologue
+// The story (replay of the opening, narrated locally)
 // ---------------------------------------------------------------------------------------------------------------------
 
-TSharedRef<SWidget> SAIBMainMenu::MakePrologue()
+TSharedRef<SWidget> SAIBMainMenu::MakeStory()
 {
-	auto LineAlpha = [this]()
-	{
-		if (PrologueIndex == INDEX_NONE)
-		{
-			return 0.f;
-		}
-		const float T = float(FPlatformTime::Seconds() - LineStart);
-		return FMath::Min(FMath::Clamp(T / 0.8f, 0.f, 1.f), FMath::Clamp((LineDuration - T) / 0.8f, 0.f, 1.f));
-	};
 	return SNew(SOverlay)
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(80.f, 0.f, 80.f, 140.f)
+		+ SOverlay::Slot()
 		[
-			SNew(SBox).MaxDesiredWidth(1200.f)
-			[
-				SNew(STextBlock)
-				.Font(AIBStyle::Story(30))
-				.Justification(ETextJustify::Center)
-				.WrapTextAt(1100.f)
-				.ShadowOffset(FVector2D(2.f, 2.f))
-				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.9f))
-				.Text_Lambda([this]() { return PrologueLines.IsValidIndex(PrologueIndex) ? UAIBAudioSubsystem::VoiceLineText(PrologueLines[PrologueIndex]) : FText::GetEmpty(); })
-				.ColorAndOpacity_Lambda([LineAlpha]() { return FSlateColor(FLinearColor(0.96f, 0.93f, 0.88f, LineAlpha())); })
-			]
+			SNew(SAIBStoryCards)
+			.Fullscreen(true)
+			.Sequence(EAIBNarration::Story)
+			.Elapsed_Lambda([this]() { return float(FPlatformTime::Seconds() - StoryStart); })
 		]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 40.f, 40.f)
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 40.f, 34.f)
 		[
-			SNew(SAIBButton).Text(LOCTEXT("SkipPrologue", "SKIP")).Kind(EAIBButtonKind::Ghost).FontSize(18)
+			SNew(SAIBButton).Text(LOCTEXT("SkipStory", "SKIP  [SPACE]")).Kind(EAIBButtonKind::Ghost).FontSize(17)
 			.OnClicked_Lambda([this]() { Go(EPage::Home); return FReply::Handled(); })
-		]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 60.f, 0.f, 0.f)
-		[
-			SNew(STextBlock).Text(LOCTEXT("PrologueTitle", "THE LONG BURN")).Font(AIBStyle::StoryBold(22)).ColorAndOpacity(FLinearColor(0.85f, 0.1f, 0.12f, 0.8f))
 		];
 }
 
-void SAIBMainMenu::StartPrologue()
+void SAIBMainMenu::StartStory()
 {
-	Current = EPage::Prologue;
-	PrologueIndex = INDEX_NONE;
-	PrologueStart = FPlatformTime::Seconds();
-	// Total duration for the camera sweep.
-	PrologueTotal = 0.f;
-	for (const FName& Line : PrologueLines)
-	{
-		USoundBase* Sound = AIBAssets::Sound(AIBAssets::Paths::Audio + TEXT("VO/") + Line.ToString());
-		PrologueTotal += FMath::Max(5.5f, (Sound ? Sound->GetDuration() : 6.f) + 1.2f);
-	}
+	Current = EPage::Story;
+	StoryStart = FPlatformTime::Seconds();
+	StoryBeat = INDEX_NONE;
 	if (UAIBGameInstance* Inst = GI())
 	{
 		Inst->GetProfile()->bSeenPrologue = true;
@@ -456,20 +769,17 @@ void SAIBMainMenu::StartPrologue()
 			Audio->PlayMusic(TEXT("MUS_Arrival"));
 		}
 	}
-	LineStart = 0.0;
-	LineDuration = 0.f;
 }
 
-void SAIBMainMenu::StopPrologue()
+void SAIBMainMenu::StopStory()
 {
-	PrologueIndex = INDEX_NONE;
-	if (Owner.IsValid())
+	StoryBeat = INDEX_NONE;
+	if (Owner.IsValid() && Owner->GetGameInstance())
 	{
-		Owner->PrologueAlpha = -1.f;
 		if (UAIBAudioSubsystem* Audio = Owner->GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>())
 		{
+			Audio->StopNarration();
 			Audio->PlayMusic(TEXT("MUS_Menu"));
-			Audio->PlayVoice(NAME_None);
 		}
 	}
 }
@@ -478,31 +788,25 @@ void SAIBMainMenu::Tick(const FGeometry& AllottedGeometry, const double InCurren
 {
 	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
 
-	if (Current == EPage::Prologue)
+	if (Current == EPage::Story)
 	{
-		const double Now = FPlatformTime::Seconds();
-		if (PrologueIndex == INDEX_NONE || Now - LineStart > LineDuration)
+		const float Elapsed = float(FPlatformTime::Seconds() - StoryStart);
+		if (Elapsed > AIBNarration::Length(EAIBNarration::Story))
 		{
-			++PrologueIndex;
-			if (!PrologueLines.IsValidIndex(PrologueIndex))
-			{
-				Go(EPage::Home);
-				return;
-			}
-			LineStart = Now;
-			USoundBase* Sound = AIBAssets::Sound(AIBAssets::Paths::Audio + TEXT("VO/") + PrologueLines[PrologueIndex].ToString());
-			LineDuration = FMath::Max(5.5f, (Sound ? Sound->GetDuration() : 6.f) + 1.2f);
-			if (Owner.IsValid())
+			Go(EPage::Home);
+			return;
+		}
+		const int32 Beat = AIBNarration::BeatAt(EAIBNarration::Story, Elapsed);
+		if (Beat != StoryBeat && Beat != INDEX_NONE)
+		{
+			StoryBeat = Beat;
+			if (Owner.IsValid() && Owner->GetGameInstance())
 			{
 				if (UAIBAudioSubsystem* Audio = Owner->GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>())
 				{
-					Audio->PlayVoice(PrologueLines[PrologueIndex]);
+					Audio->PlayVoice(AIBNarration::Get(EAIBNarration::Story).Beats[Beat].Line);
 				}
 			}
-		}
-		if (Owner.IsValid())
-		{
-			Owner->PrologueAlpha = FMath::Clamp(float(Now - PrologueStart) / FMath::Max(1.f, PrologueTotal), 0.f, 1.f);
 		}
 	}
 
@@ -525,9 +829,9 @@ void SAIBMainMenu::Tick(const FGeometry& AllottedGeometry, const double InCurren
 TSharedRef<SWidget> SAIBMainMenu::MakeHowTo()
 {
 	const FText Controls = LOCTEXT("Controls",
-		"ON FOOT  -  WASD move, Mouse look, Shift sprint, Space jump\n"
+		"ON FOOT  -  WASD move, Mouse look, Shift sprint, Space jump, E read a marker stone\n"
 		"DRIVING  -  W/S throttle and brake, A/D steer, Space handbrake, R reset, hold E on the switch\n"
-		"ALWAYS  -  Enter chat, Tab scoreboard, Esc menu.  Gamepads are supported too.");
+		"ALWAYS  -  hold V to talk (voice chat), Enter text chat, Tab scoreboard, Esc menu.  Gamepads are supported too.");
 	return SNew(SBox)
 		.HAlign(HAlign_Center)
 		.VAlign(VAlign_Center)
@@ -543,7 +847,7 @@ TSharedRef<SWidget> SAIBMainMenu::MakeHowTo()
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f)
 					[
 						SNew(STextBlock)
-						.Text(LOCTEXT("HowToIntro", "Five champions land on the last island. After a short time to explore, the Guardian's three trials begin. Only two will reach the end - and then one terrible choice decides who wins and which community survives."))
+						.Text(LOCTEXT("HowToIntro", "Five champions land on the last island. After some time to explore (look for the marker stones), the Guardian's three trials begin. Only two will reach the end - and then one terrible choice decides who wins and which community survives."))
 						.Font(AIBStyle::Body(17)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
 					]
 					+ SVerticalBox::Slot().AutoHeight()[SAIBHud::MakeRules(false)]

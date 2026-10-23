@@ -33,6 +33,10 @@ public:
 	UFUNCTION(Server, Reliable) void ServerAddBot();
 	UFUNCTION(Server, Reliable) void ServerFillBots();
 	UFUNCTION(Server, Reliable) void ServerRemoveSeat(int32 Slot);
+	UFUNCTION(Server, Reliable) void ServerStartMatch();
+	UFUNCTION(Server, Reliable) void ServerSetAITestMode(bool bOn);
+	UFUNCTION(Server, Reliable) void ServerDiscoverLore(int32 Index);
+	UFUNCTION(Server, Reliable) void ServerSetTalking(bool bTalking);
 	UFUNCTION(Server, Reliable) void ServerSkipCinematic();
 	UFUNCTION(Server, Reliable) void ServerReturnToLobby();
 	UFUNCTION(Server, Reliable) void ServerSubmitNumber(int32 Number);
@@ -60,6 +64,12 @@ public:
 	const TMap<int32, EAIBSymbol>& GetVisibleSymbols() const { return VisibleSymbols; }
 	APawn* GetSpectateTarget() const { return SpectateTarget.Get(); }
 	bool HasLocallySkipped() const { return bLocalSkip; }
+	/** Marker stone the champion is standing at (INDEX_NONE if none) - the HUD shows the read prompt. */
+	int32 GetNearLore() const { return NearLore; }
+	/** Marker stones read this match (server state merged with the ones just read locally). */
+	int32 GetLoreFound() const;
+	/** Voice chat: microphone currently sending. */
+	bool IsSpeaking() const { return bSpeaking; }
 
 	/** Number currently dialled in on the selector (not yet sent). */
 	int32 DraftNumber = 50;
@@ -77,6 +87,8 @@ public:
 
 	float MouseSensitivity = 1.f;
 	bool bInvertY = false;
+	float FieldOfView = 80.f;
+	int32 MicMode = 1;
 
 protected:
 	void BuildInput();
@@ -85,6 +97,11 @@ protected:
 	void UpdateSymbols();
 	void UpdateCountdownSounds();
 	void UpdateInputMode();
+	/** Plays Alice's lines for the current phase in step with the phase clock. */
+	void UpdateNarration();
+	void UpdateVoiceChat();
+	void UpdateLore();
+	void ApplySettings();
 	void ChooseSpectateTarget(int32 Direction);
 
 	// Input handlers
@@ -103,6 +120,7 @@ protected:
 	void OnResetVehicle();
 	void OnSpectateNext();
 	void OnSpectatePrev();
+	void OnTalk(const FInputActionValue& Value);
 
 	bool IsMovementAllowed() const;
 
@@ -121,6 +139,7 @@ protected:
 	UPROPERTY() TObjectPtr<UInputAction> IA_Reset;
 	UPROPERTY() TObjectPtr<UInputAction> IA_SpectateNext;
 	UPROPERTY() TObjectPtr<UInputAction> IA_SpectatePrev;
+	UPROPERTY() TObjectPtr<UInputAction> IA_Talk;
 
 	UPROPERTY() TObjectPtr<ACameraActor> CineCamera;
 
@@ -137,4 +156,12 @@ protected:
 	int32 LastTickSecond = -1;
 	int32 LastPhaseSerial = -1;
 	int32 LastShot = -1;
+	int32 NarrationSerial = -1;
+	int32 NarrationBeat = INDEX_NONE;
+	int32 NearLore = INDEX_NONE;
+	int32 LocalLoreFound = 0;
+	bool bTalkHeld = false;
+	bool bSpeaking = false;
+	bool bLobbyWelcomed = false;
+	bool bVoiceRegistered = false;
 };

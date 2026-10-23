@@ -1,6 +1,7 @@
 // Alice in Botherland - UI look: fonts, colours, brushes (pure Slate, files loaded at runtime)
 
 #include "UI/AIBStyle.h"
+#include "Audio/AIBNarration.h"
 #include "Audio/AIBAudioSubsystem.h"
 #include "Styling/CoreStyle.h"
 #include "Styling/SlateTypes.h"
@@ -148,6 +149,26 @@ namespace AIBStyle
 			Brush->DrawAs = ESlateBrushDrawType::Image;
 		}
 		Cache.Add(Key, Brush);
+		return Brush.Get();
+	}
+
+	const FSlateBrush* StoryImage(FName Id)
+	{
+		static TMap<FName, TSharedPtr<FSlateBrush>> Cache;
+		if (TSharedPtr<FSlateBrush>* Found = Cache.Find(Id))
+		{
+			return Found->Get();
+		}
+		TSharedPtr<FSlateBrush> Brush;
+		if (UTexture2D* Texture = Cast<UTexture2D>(AIBAssets::Load(AIBNarration::ImagePath(Id))))
+		{
+			Texture->AddToRoot();
+			Brush = MakeShared<FSlateBrush>();
+			Brush->SetResourceObject(Texture);
+			Brush->ImageSize = FVector2f(1536.f, 864.f);
+			Brush->DrawAs = ESlateBrushDrawType::Image;
+		}
+		Cache.Add(Id, Brush);
 		return Brush.Get();
 	}
 

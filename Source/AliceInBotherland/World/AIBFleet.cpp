@@ -227,7 +227,8 @@ float AAIBFleet::RouteDistance(int32 Slot, const AAIBGameState* GS, bool& bDepar
 	{
 		// Every ship covers the same convoy distance, so the column keeps its gaps through the channel; each one
 		// then eases to a stop at its own mooring.
-		const float T = GS->GetPhaseElapsed() / AIB::ArrivalCinematic;
+		// The arrival shows the end of the voyage: the ships are already sailing into the cove.
+		const float T = (AIB::ArrivalSkipTo + GS->GetPhaseElapsed()) / AIB::ArrivalVoyage;
 		return SoftStop(ConvoyLength * EaseOut(T, 1.8f), Length);
 	}
 	case EAIBPhase::EndingCinematic:

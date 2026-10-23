@@ -36,12 +36,11 @@ void AAIBGameMode::Stage1_Enter()
 			TeleportSlot(PS->Slot, Arena->GetStandTransform(PS->Slot));
 		}
 	}
-	SetAllMovementLocked(true);
+	// Champions may walk around the chamber while Alice explains the rules; each round seats them again.
+	SetAllMovementLocked(false);
 
 	Cue(TEXT("SFX_Stinger_Title"));
-	Cue(TEXT("VO_Stage1_Brief"));
 	Cue(TEXT("MUS_Stage1"));
-	Announce(LOCTEXT("S1Title", "STAGE 1  -  THE NUMBER GAME"), LOCTEXT("S1Sub", "Pick 0-100. Target = average x 0.8. Farthest from the target is eliminated."), FLinearColor(1.f, 0.25f, 0.2f));
 }
 
 void AAIBGameMode::Stage1_BeginRound()
@@ -91,6 +90,14 @@ void AAIBGameMode::Stage1_BeginRound()
 	GS->Stage1Last = FAIBStage1Round();
 	GS->Stage1Last.Round = GS->Stage1Round;
 	GS->Stage1Last.bSuddenDeath = GS->bStage1SuddenDeath;
+	if (AAIBNumberArena* Arena = WorldSys() ? WorldSys()->GetNumberArena() : nullptr)
+	{
+		for (AAIBPlayerState* PS : Active)
+		{
+			TeleportSlot(PS->Slot, Arena->GetStandTransform(PS->Slot));
+		}
+	}
+	SetAllMovementLocked(true);
 	EnterPhase(EAIBPhase::Stage1RoundIntro);
 }
 
@@ -259,10 +266,7 @@ void AAIBGameMode::Stage2_Enter()
 	}
 
 	Cue(TEXT("SFX_Stinger_Title"));
-	Cue(TEXT("VO_Stage2_Brief"));
 	Cue(TEXT("MUS_Stage2"));
-	Announce(LOCTEXT("S2Title", "STAGE 2  -  THE HIDDEN SYMBOL"),
-		LOCTEXT("S2Sub", "Everyone sees your symbol except you. Talk, trust, deceive. Top two advance."), FLinearColor(0.6f, 0.75f, 1.f));
 }
 
 void AAIBGameMode::Stage2_BeginRound()

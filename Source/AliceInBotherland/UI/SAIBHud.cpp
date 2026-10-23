@@ -4,6 +4,7 @@
 #include "UI/AIBStyle.h"
 #include "UI/SAIBWidgets.h"
 #include "UI/SAIBLoadingScreen.h"
+#include "UI/SAIBStoryCards.h"
 #include "Player/AIBPlayerController.h"
 #include "Player/AIBCharacter.h"
 #include "Player/AIBVehicle.h"
@@ -11,6 +12,8 @@
 #include "Game/AIBPlayerState.h"
 #include "Core/AIBGameInstance.h"
 #include "Audio/AIBAudioSubsystem.h"
+#include "Audio/AIBNarration.h"
+#include "World/AIBLoreStones.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Text/SRichTextBlock.h"
 #include "Widgets/Layout/SBox.h"
@@ -164,6 +167,7 @@ void SAIBHud::Construct(const FArguments& InArgs)
 				Alpha = 1.f;
 				break;
 			case EAIBPhase::Lobby:
+			case EAIBPhase::StoryIntro:
 			case EAIBPhase::ArrivalCinematic:
 			case EAIBPhase::IslandExplore:
 			case EAIBPhase::Stage1Briefing:
@@ -192,7 +196,6 @@ void SAIBHud::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 150.f, 0.f, 0.f)[MakeBanner()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f, 120.f, 0.f, 0.f)[MakeRoster()]
 		+ SOverlay::Slot()[MakeLobbyPanel()]
-		+ SOverlay::Slot()[MakeArrivalPanel()]
 		+ SOverlay::Slot()[MakeNumberPanel()]
 		+ SOverlay::Slot()[MakeNumberResults()]
 		+ SOverlay::Slot()[MakeSymbolPanel()]
@@ -201,13 +204,16 @@ void SAIBHud::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot()[MakeRacePanel()]
 		+ SOverlay::Slot()[MakeFinalPanel()]
 		+ SOverlay::Slot()[MakeResultsPanel()]
+		+ SOverlay::Slot()[MakeExplorePanel()]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center).Padding(0.f, 40.f, 36.f, 0.f)[MakeRulesCard()]
+		+ SOverlay::Slot()[MakeStoryLayer()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)
 		.Padding(TAttribute<FMargin>::CreateLambda([this]()
 		{
 			// In the lobby the Gathering panel fills the left column, so the chat moves beside it.
 			const EAIBPhase P = Phase();
 			const bool bLobby = P == EAIBPhase::Lobby || P == EAIBPhase::LobbyCountdown;
-			return FMargin(bLobby ? 720.f : 24.f, 0.f, 0.f, 24.f);
+			return FMargin(bLobby ? 700.f : 24.f, 0.f, 0.f, 24.f);
 		}))
 		[MakeChat()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom)
@@ -219,7 +225,9 @@ void SAIBHud::Construct(const FArguments& InArgs)
 			return FMargin(0.f, 0.f, bPanelRight ? 640.f : 0.f, bCardsBelow ? 400.f : 96.f);
 		}))
 		[MakeSubtitles()]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 130.f, 28.f, 0.f)[MakeToasts()]
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
+		.Padding(TAttribute<FMargin>::CreateLambda([this]() { return FMargin(0.f, Phase() == EAIBPhase::IslandExplore ? 160.f : 130.f, 28.f, 0.f); }))
+		[MakeToasts()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 28.f, 24.f)[MakeHints()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 36.f)[MakeSpectatorBar()]
 		+ SOverlay::Slot()[MakeScoreboard()]
@@ -338,10 +346,29 @@ void SAIBHud::CloseChat()
 	FSlateApplication::Get().SetAllUserFocusToGameViewport();
 }
 
+void SAIBHud::OpenSettings()
+{
+	bPauseOpen = true;
+	bSettingsOpen = true;
+	bSettingsOnly = true;
+	bRulesOpen = false;
+	AIBStyle::PlayUISound(TEXT("SFX_UI_Click"));
+}
+
+void SAIBHud::OpenRules()
+{
+	bPauseOpen = true;
+	bRulesOpen = true;
+	bSettingsOpen = false;
+	bSettingsOnly = true;
+	AIBStyle::PlayUISound(TEXT("SFX_UI_Click"));
+}
+
 void SAIBHud::TogglePause()
 {
 	bPauseOpen = !bPauseOpen;
 	bSettingsOpen = false;
+	bSettingsOnly = false;
 	bRulesOpen = false;
 	AIBStyle::PlayUISound(bPauseOpen ? TEXT("SFX_UI_Click") : TEXT("SFX_UI_Back"));
 	if (!bPauseOpen)
@@ -367,6 +394,7 @@ TSharedRef<SWidget> SAIBHud::MakeTopBar()
 		{
 		case EAIBPhase::Lobby:
 		case EAIBPhase::LobbyCountdown:
+		case EAIBPhase::StoryIntro:
 		case EAIBPhase::ArrivalCinematic:
 		case EAIBPhase::EndingCinematic:
 		case EAIBPhase::Results:
@@ -475,6 +503,7 @@ TSharedRef<SWidget> SAIBHud::MakeBanner()
 				SNew(STextBlock)
 				.Font(AIBStyle::Title(72))
 				.Justification(ETextJustify::Center)
+				.WrapTextAt(1250.f)
 				.ShadowOffset(FVector2D(2.f, 2.f))
 				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f))
 				.Text_Lambda([this]() { const AAIBGameState* G = GS(); return G ? G->BannerTitle : FText::GetEmpty(); })
@@ -606,6 +635,10 @@ TSharedRef<SWidget> SAIBHud::MakeSeatRow(int32 Slot)
 						})
 					]
 				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)
+				[
+					AIBUI::TalkDot(TAttribute<bool>::CreateLambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && PS->bTalking; }))
+				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
@@ -664,6 +697,7 @@ TSharedRef<SWidget> SAIBHud::MakeRoster()
 			}
 			switch (G->Phase)
 			{
+			case EAIBPhase::StoryIntro:
 			case EAIBPhase::ArrivalCinematic:
 			case EAIBPhase::EndingCinematic:
 			case EAIBPhase::Results:
@@ -694,7 +728,7 @@ TSharedRef<SWidget> SAIBHud::MakeChat()
 			{
 				return bChatOpen ? EVisibility::Visible : EVisibility::Collapsed;
 			}
-			const bool bAlways = G->Phase == EAIBPhase::Lobby || G->Phase == EAIBPhase::LobbyCountdown || G->Phase == EAIBPhase::Stage2Communication || G->Phase == EAIBPhase::Stage2Guess;
+			const bool bAlways = G->Phase == EAIBPhase::Stage2Communication || G->Phase == EAIBPhase::Stage2Guess;
 			const bool bRecent = FPlatformTime::Seconds() - LastChatTime < 10.0;
 			if (bChatOpen)
 			{
@@ -832,34 +866,57 @@ TSharedRef<SWidget> SAIBHud::MakeSubtitles()
 		AAIBPlayerController* Controller = PC();
 		return Controller && Controller->GetGameInstance() ? Controller->GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>() : nullptr;
 	};
+	auto Scale = [this]()
+	{
+		AAIBPlayerController* Controller = PC();
+		UAIBGameInstance* GI = Controller ? Controller->GetGameInstance<UAIBGameInstance>() : nullptr;
+		return GI ? FMath::Clamp(GI->GetSettings().SubtitleScale, 0.8f, 1.5f) : 1.f;
+	};
 	return SNew(SBox)
-		.MaxDesiredWidth(1100.f)
-		.Visibility_Lambda([Audio]()
+		.MaxDesiredWidth(1180.f)
+		.Visibility_Lambda([this, Audio]()
 		{
 			UAIBAudioSubsystem* A = Audio();
-			return A && !A->GetSubtitle().IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			if (!A || A->GetSubtitle().IsEmpty())
+			{
+				return EVisibility::Collapsed;
+			}
+			// Lines already written on the story screen or the rules card are not captioned twice.
+			const AAIBGameState* G = GS();
+			const EAIBNarration Which = G ? AIBNarration::ForPhase(G->Phase) : EAIBNarration::None;
+			if (G && SAIBStoryCards::IsShowing(Which, G->GetPhaseElapsed()) && AIBNarration::Contains(Which, A->GetSubtitleLine()))
+			{
+				return EVisibility::Collapsed;
+			}
+			return EVisibility::HitTestInvisible;
 		})
 		[
 			SNew(SBorder)
-			.BorderImage(AIBStyle::RoundBrush(6.f))
-			.BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.55f))
-			.Padding(FMargin(22.f, 10.f))
+			.BorderImage(AIBStyle::RoundBrush(8.f))
+			.BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.62f))
+			.Padding(FMargin(26.f, 12.f, 26.f, 14.f))
 			[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 				[
 					SNew(STextBlock)
-					.Font(AIBStyle::SubHeading(13))
-					.ColorAndOpacity(AIBStyle::Blood())
+					.Font_Lambda([Scale]() { return AIBStyle::SubHeading(FMath::RoundToInt(15 * Scale())); })
 					.Text_Lambda([Audio]() { UAIBAudioSubsystem* A = Audio(); return A ? A->GetSubtitleSpeaker() : FText::GetEmpty(); })
+					.ColorAndOpacity_Lambda([Audio]()
+					{
+						// Alice, the narrator, in gold; everyone else in red.
+						UAIBAudioSubsystem* A = Audio();
+						return FSlateColor(A && AIBNarration::IsNarratorLine(A->GetSubtitleLine()) ? AIBStyle::Gold() : AIBStyle::Blood());
+					})
 				]
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 2.f, 0.f, 0.f)
 				[
 					SNew(STextBlock)
-					.Font(AIBStyle::Story(20))
+					.Font_Lambda([Scale]() { return AIBStyle::BodyMedium(FMath::RoundToInt(23 * Scale())); })
 					.ColorAndOpacity(AIBStyle::Text())
 					.Justification(ETextJustify::Center)
-					.WrapTextAt(980.f)
+					.WrapTextAt(1080.f)
+					.LineHeightPercentage(1.1f)
 					.Text_Lambda([Audio]() { UAIBAudioSubsystem* A = Audio(); return A ? A->GetSubtitle() : FText::GetEmpty(); })
 				]
 			]
@@ -902,12 +959,16 @@ TSharedRef<SWidget> SAIBHud::MakeHints()
 			}
 			switch (G->Phase)
 			{
+			case EAIBPhase::StoryIntro:
 			case EAIBPhase::ArrivalCinematic:
 				return PC() && PC()->HasLocallySkipped() ? LOCTEXT("HintSkipped", "Waiting for the others to skip...") : LOCTEXT("HintSkip", "[SPACE] Skip");
 			case EAIBPhase::IslandExplore:
-				return LOCTEXT("HintExplore", "WASD move   SHIFT sprint   SPACE jump   ENTER chat   TAB scores");
+				return LOCTEXT("HintExplore", "WASD move   SHIFT sprint   SPACE jump   E read stone   V talk   ENTER chat   TAB scores");
+			case EAIBPhase::Stage1Briefing:
+			case EAIBPhase::Stage2Briefing:
+				return LOCTEXT("HintBrief", "WASD move   V talk   ENTER chat   TAB scores");
 			case EAIBPhase::Stage2Communication:
-				return LOCTEXT("HintComm", "WASD move   ENTER talk / quick-tell   TAB scores");
+				return LOCTEXT("HintComm", "WASD move   V talk   ENTER chat / quick-tell   TAB scores");
 			case EAIBPhase::Stage3Briefing:
 			case EAIBPhase::Stage3Countdown:
 			case EAIBPhase::Stage3Race:
@@ -940,6 +1001,132 @@ TSharedRef<SWidget> SAIBHud::MakeSpectatorBar()
 				return PS ? FText::Format(LOCTEXT("Spectating", "SPECTATING  {0}     LMB / RMB switch"), FText::FromString(PS->GetPlayerName().ToUpper()))
 					: LOCTEXT("SpectatingNone", "SPECTATING - your fate is sealed. Watch the others decide theirs.");
 			})
+		];
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Story, rules cards, exploration
+// ---------------------------------------------------------------------------------------------------------------------
+
+TSharedRef<SWidget> SAIBHud::MakeStoryLayer()
+{
+	return SNew(SBox)
+		.Visibility_Lambda([this]() { return Phase() == EAIBPhase::StoryIntro ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		[
+			SNew(SAIBStoryCards)
+			.Fullscreen(true)
+			.Sequence(EAIBNarration::Story)
+			.Elapsed_Lambda([this]() { const AAIBGameState* G = GS(); return G ? G->GetPhaseElapsed() : 0.f; })
+		];
+}
+
+TSharedRef<SWidget> SAIBHud::MakeRulesCard()
+{
+	auto Which = [this]() { const AAIBGameState* G = GS(); return G ? AIBNarration::ForPhase(G->Phase) : EAIBNarration::None; };
+	return SNew(SBox)
+		.Visibility_Lambda([this, Which]()
+		{
+			const AAIBGameState* G = GS();
+			const EAIBNarration Sequence = Which();
+			const bool bShow = G && !bScoreboard && Sequence != EAIBNarration::Story && SAIBStoryCards::IsShowing(Sequence, G->GetPhaseElapsed());
+			return bShow ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+		})
+		[
+			SNew(SAIBStoryCards)
+			.Fullscreen(false)
+			.Sequence_Lambda(Which)
+			.Elapsed_Lambda([this]() { const AAIBGameState* G = GS(); return G ? G->GetPhaseElapsed() : 0.f; })
+		];
+}
+
+TSharedRef<SWidget> SAIBHud::MakeExplorePanel()
+{
+	auto Found = [this]() { return PC() ? int32(FMath::CountBits64(uint64(PC()->GetLoreFound()))) : 0; };
+	TSharedRef<SHorizontalBox> Dots = SNew(SHorizontalBox);
+	for (int32 Index = 0; Index < AAIBLoreStones::Count; ++Index)
+	{
+		Dots->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(3.f, 0.f)
+		[
+			SNew(SBox).WidthOverride(12.f).HeightOverride(12.f)
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::RoundBrush(6.f))
+				.BorderBackgroundColor_Lambda([this, Index]()
+				{
+					const bool bRead = PC() && (PC()->GetLoreFound() & (1 << Index));
+					return FSlateColor(bRead ? AIBStyle::Acid() : FLinearColor(1.f, 1.f, 1.f, 0.16f));
+				})
+			]
+		];
+	}
+
+	return SNew(SOverlay)
+		.Visibility_Lambda([this]() { return Phase() == EAIBPhase::IslandExplore && !bScoreboard ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+		// Objective.
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 26.f, 28.f, 0.f)
+		[
+			SNew(SBox)
+			.WidthOverride(340.f)
+			.Visibility(EVisibility::HitTestInvisible)
+			[
+				AIBUI::Panel(
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(STextBlock).Text(LOCTEXT("ExploreTitle", "EXPLORE THE ISLAND")).Font(AIBStyle::Heading(20)).ColorAndOpacity(AIBStyle::Gold())
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f, 0.f, 8.f)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("ExploreBody", "Follow the green light pillars to the old marker stones."))
+						.Font(AIBStyle::Body(14)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
+					]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						[
+							SNew(STextBlock)
+							.Font(AIBStyle::SubHeading(17))
+							.ColorAndOpacity_Lambda([Found]() { return FSlateColor(Found() >= AAIBLoreStones::Count ? AIBStyle::Acid() : AIBStyle::Text()); })
+							.Text_Lambda([Found]()
+							{
+								return Found() >= AAIBLoreStones::Count ? LOCTEXT("AllStones", "ALL STONES READ")
+									: FText::Format(LOCTEXT("StonesRead", "STONES READ  {0} / {1}"), Found(), AAIBLoreStones::Count);
+							})
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Dots]
+					],
+					FMargin(18.f, 12.f))
+			]
+		]
+		// Read prompt at a stone.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 300.f, 0.f, 0.f)
+		[
+			SNew(SBox)
+			.Visibility_Lambda([this]() { return PC() && PC()->GetNearLore() != INDEX_NONE ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::RoundBrush(8.f))
+				.BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.7f))
+				.Padding(FMargin(20.f, 10.f))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)
+					[
+						SNew(SBorder)
+						.BorderImage(AIBStyle::OutlineBrush(AIBStyle::Acid(), 5.f, 2.f))
+						.Padding(FMargin(10.f, 2.f))
+						[
+							SNew(STextBlock).Text(FText::FromString(TEXT("E"))).Font(AIBStyle::Title(26)).ColorAndOpacity(AIBStyle::Acid())
+						]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(LOCTEXT("ReadStone", "READ THE MARKER STONE")).Font(AIBStyle::Heading(22)).ColorAndOpacity(AIBStyle::Text())
+					]
+				]
+			]
 		];
 }
 
@@ -1113,14 +1300,13 @@ TSharedRef<SWidget> SAIBHud::MakePauseMenu()
 					.GameInstance(GI)
 					.OnClose_Lambda([this]()
 					{
+						// Opened from the lobby: straight back to it. From the pause menu: back to the menu.
 						bSettingsOpen = false;
-						if (AAIBPlayerController* Controller = PC())
+						if (bSettingsOnly)
 						{
-							if (UAIBGameInstance* Inst = Controller->GetGameInstance<UAIBGameInstance>())
-							{
-								Controller->MouseSensitivity = Inst->GetSettings().MouseSensitivity;
-								Controller->bInvertY = Inst->GetSettings().bInvertY;
-							}
+							bSettingsOnly = false;
+							bPauseOpen = false;
+							FSlateApplication::Get().SetAllUserFocusToGameViewport();
 						}
 					})
 				]
@@ -1141,7 +1327,17 @@ TSharedRef<SWidget> SAIBHud::MakePauseMenu()
 						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 14.f, 0.f, 0.f)
 						[
 							SNew(SAIBButton).Text(LOCTEXT("Back", "BACK")).MinWidth(160.f)
-							.OnClicked_Lambda([this]() { bRulesOpen = false; return FReply::Handled(); })
+							.OnClicked_Lambda([this]()
+							{
+								bRulesOpen = false;
+								if (bSettingsOnly)
+								{
+									bSettingsOnly = false;
+									bPauseOpen = false;
+									FSlateApplication::Get().SetAllUserFocusToGameViewport();
+								}
+								return FReply::Handled();
+							})
 						],
 						FMargin(32.f), true)
 				]

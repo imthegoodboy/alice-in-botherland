@@ -38,6 +38,12 @@ public:
 	void RequestAddBot(AAIBPlayerController* PC);
 	void RequestFillBots(AAIBPlayerController* PC);
 	void RequestRemoveSeat(AAIBPlayerController* PC, int32 Slot);
+	/** Host: start the trials (every seat filled and every champion ready). */
+	void RequestStart(AAIBPlayerController* PC);
+	/** Host: AI test mode keeps every empty seat filled with an AI champion. */
+	void RequestSetAITestMode(AAIBPlayerController* PC, bool bOn);
+	void DiscoverLore(AController* Controller, int32 Index);
+	void SetTalking(AController* Controller, bool bTalking);
 	void RequestSkipCinematic(AAIBPlayerController* PC);
 	void RequestReturnToLobby(AAIBPlayerController* PC);
 	void SubmitNumber(AController* Controller, int32 Number);
@@ -63,6 +69,9 @@ protected:
 	void RemoveBot(AAIBBotController* Bot);
 	bool LobbyIsReady() const;
 	void TickLobby();
+	void StartCountdown();
+	/** Room codes from the host's LAN and public addresses. */
+	void UpdateRoomCodes();
 	void BeginMatch();
 	void ResetToLobby();
 	void HandleGhosts();
