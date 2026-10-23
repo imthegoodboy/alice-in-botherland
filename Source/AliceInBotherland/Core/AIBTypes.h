@@ -223,7 +223,7 @@ namespace AIB
 	constexpr float ArrivalVoyage = 20.f;
 	constexpr float ArrivalSkipTo = 12.f;
 	constexpr float ArrivalCinematic = ArrivalVoyage - ArrivalSkipTo;
-	constexpr float IslandExplore = 120.f;
+	constexpr float IslandExplore = 30.f;
 	constexpr float Stage1Briefing = 10.f;
 	constexpr float Stage1RoundIntro = 5.f;
 	constexpr float Stage1Selection = 10.f;

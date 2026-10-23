@@ -30,7 +30,7 @@ Five champions (human players, with AI filling any empty seats) play one match:
 | **Room** | The host creates a room and shares its **room code**; friends join by typing it. When all five seats are filled (AI test mode fills empty seats with AI) and everyone is ready, the host presses **Start**. |
 | **The story** | A narrated picture story (skippable): the fall of Earth, the search for survival, the last island, the Guardian's trials. |
 | **Arrival** | A short cinematic (skippable): the fleets sail through the channel into the cove and the champions land. |
-| **The island** | Two minutes to explore. Five old marker stones (follow the green light pillars) each tell part of the island's past. |
+| **The island** | 30 seconds to explore. Five old marker stones (follow the green light pillars) each tell part of the island's past. |
 | **Stage 1: the Number Game** | Everyone secretly picks 0-100. Target = average × 0.8. The champion **farthest** from the target is eliminated. Ties go to sudden death. |
 | **Stage 2: the Hidden Symbol** | Everyone sees every symbol except their own. Talk in chat, trust, lie, then name your own symbol. 3 rounds; the top two advance. |
 | **Stage 3: the race** | The two finalists drive offroad buggies to the Guardian's beam and hold the switch for 3 s. Winning only earns the **first choice**. |

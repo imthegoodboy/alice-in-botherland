@@ -10,6 +10,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "AudioDevice.h"
+#include "AliceInBotherland.h"
 
 #define LOCTEXT_NAMESPACE "AIBAudio"
 
@@ -188,7 +189,18 @@ void UAIBAudioSubsystem::StopMusic(float FadeOut)
 	CurrentTrack = NAME_None;
 }
 
-void UAIBAudioSubsystem::PlayVoice(FName LineId)
+void UAIBAudioSubsystem::PreloadVoices(const TArray<FName>& LineIds)
+{
+	for (const FName& LineId : LineIds)
+	{
+		if (USoundBase* Sound = LoadSound(TEXT("VO"), LineId, false))
+		{
+			PreloadedVoices.AddUnique(Sound);
+		}
+	}
+}
+
+void UAIBAudioSubsystem::PlayVoice(FName LineId, float StartAt)
 {
 	CheckWorld();
 	UWorld* World = GetAudioWorld();
@@ -202,14 +214,16 @@ void UAIBAudioSubsystem::PlayVoice(FName LineId)
 		Voice->Stop();
 	}
 	const float Duration = Sound ? Sound->GetDuration() : 4.f;
+	StartAt = FMath::Clamp(StartAt, 0.f, FMath::Max(0.f, Duration - 0.2f));
+	UE_LOG(LogAIB, Verbose, TEXT("Voice %s (%.2fs) from %.2fs"), *LineId.ToString(), Duration, StartAt);
 	SubtitleLine = LineId;
-	SubtitleEnd = World->GetRealTimeSeconds() + FMath::Max(2.5f, Duration + 0.6f);
+	SubtitleEnd = World->GetRealTimeSeconds() + FMath::Max(2.5f, Duration - StartAt + 0.6f);
 	if (Sound)
 	{
 		Voice = MakeComponent(Sound, MasterVol * VoiceVol);
 		if (Voice)
 		{
-			Voice->Play();
+			Voice->Play(StartAt);
 		}
 	}
 }

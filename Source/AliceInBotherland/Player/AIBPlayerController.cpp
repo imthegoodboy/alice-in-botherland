@@ -9,6 +9,7 @@
 #include "Core/AIBGameInstance.h"
 #include "Audio/AIBAudioSubsystem.h"
 #include "Audio/AIBNarration.h"
+#include "UI/AIBStyle.h"
 #include "OnlineSubsystemUtils.h"
 #include "Interfaces/VoiceInterface.h"
 #include "World/AIBLoreStones.h"
@@ -859,6 +860,16 @@ void AAIBPlayerController::UpdateNarration()
 		{
 			Audio->PlayVoice(TEXT("NAR_Results"));
 		}
+		// Load the coming narration (voice and pictures) before it is needed: a stall mid-story would put Alice out
+		// of step with her captions. The story is loaded while the room counts down.
+		const EAIBNarration Coming = GS->Phase == EAIBPhase::LobbyCountdown ? EAIBNarration::Story : AIBNarration::ForPhase(GS->Phase);
+		TArray<FName> ComingLines;
+		for (const AIBNarration::FBeat& Beat : AIBNarration::Get(Coming).Beats)
+		{
+			ComingLines.Add(Beat.Line);
+			AIBStyle::StoryImage(Beat.Image);
+		}
+		Audio->PreloadVoices(ComingLines);
 	}
 	// Alice greets each champion once, when they first arrive at the gathering.
 	if (!bLobbyWelcomed && GS->Phase == EAIBPhase::Lobby && !GS->bAITestMode && GetLocalSlot() != INDEX_NONE && GS->GetPhaseElapsed() > 1.5f)
@@ -879,10 +890,13 @@ void AAIBPlayerController::UpdateNarration()
 	}
 	NarrationBeat = Beat;
 	const AIBNarration::FSequence& Sequence = AIBNarration::Get(Which);
-	// Someone joining mid-line waits for the next one rather than starting halfway through a sentence.
-	if (Elapsed - Sequence.Starts[Beat] < 1.f)
+	// Start the line where the clock says it should be, so the voice matches the caption even after a stall. Someone
+	// joining near the end of a line waits for the next one.
+	const AIBNarration::FLine* Line = AIBNarration::FindLine(Sequence.Beats[Beat].Line);
+	const float Offset = Elapsed - Sequence.Starts[Beat];
+	if (Offset < (Line ? Line->Duration * 0.6f : 1.f))
 	{
-		Audio->PlayVoice(Sequence.Beats[Beat].Line);
+		Audio->PlayVoice(Sequence.Beats[Beat].Line, Offset > 0.15f ? Offset : 0.f);
 	}
 }
 

@@ -33,7 +33,10 @@ public:
 	void PlayCue(FName CueId);
 	void PlayMusic(FName TrackId);
 	void StopMusic(float FadeOut = 2.f);
-	void PlayVoice(FName LineId);
+	/** Plays a voice line (StartAt: seconds into the recording, to stay in step with captions on a shared clock). */
+	void PlayVoice(FName LineId, float StartAt = 0.f);
+	/** Loads voice lines now and keeps them loaded, so starting them later never stalls a frame. */
+	void PreloadVoices(const TArray<FName>& LineIds);
 	/** Stops Alice mid-sentence (her sequence's phase ended early, e.g. skipped). */
 	void StopNarration();
 	/** Voice line currently captioned (None when silent). */
@@ -61,6 +64,7 @@ private:
 	UPROPERTY() TObjectPtr<UAudioComponent> MusicB;
 	UPROPERTY() TObjectPtr<UAudioComponent> Voice;
 	UPROPERTY() TObjectPtr<UAudioComponent> Ambience;
+	UPROPERTY() TArray<TObjectPtr<USoundBase>> PreloadedVoices;
 
 	FName CurrentTrack;
 	FName CurrentAmbience;

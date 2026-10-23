@@ -766,9 +766,18 @@ void SAIBMainMenu::StartStory()
 	{
 		if (UAIBAudioSubsystem* Audio = Owner->GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>())
 		{
+			TArray<FName> Lines;
+			for (const AIBNarration::FBeat& Beat : AIBNarration::Get(EAIBNarration::Story).Beats)
+			{
+				Lines.Add(Beat.Line);
+				AIBStyle::StoryImage(Beat.Image);
+			}
+			Audio->PreloadVoices(Lines);
 			Audio->PlayMusic(TEXT("MUS_Arrival"));
 		}
 	}
+	// Loading may have taken a moment: start the clock now.
+	StoryStart = FPlatformTime::Seconds();
 }
 
 void SAIBMainMenu::StopStory()
@@ -804,7 +813,8 @@ void SAIBMainMenu::Tick(const FGeometry& AllottedGeometry, const double InCurren
 			{
 				if (UAIBAudioSubsystem* Audio = Owner->GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>())
 				{
-					Audio->PlayVoice(AIBNarration::Get(EAIBNarration::Story).Beats[Beat].Line);
+					const float Offset = Elapsed - AIBNarration::Get(EAIBNarration::Story).Starts[Beat];
+					Audio->PlayVoice(AIBNarration::Get(EAIBNarration::Story).Beats[Beat].Line, Offset > 0.15f ? Offset : 0.f);
 				}
 			}
 		}

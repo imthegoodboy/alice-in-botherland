@@ -406,76 +406,70 @@ void SAIBStoryCards::RebuildLines()
 	{
 		return;
 	}
-	// Full screen: the lines of the current chapter. Rules card: everything said so far.
-	const int32 First = bFullscreen ? CardStart(CurrentBeat) : 0;
-	for (int32 Index = First; Index <= CurrentBeat; ++Index)
+	// Only the line Alice is speaking right now, so the words on screen always match her voice.
+	const AIBNarration::FLine* Line = AIBNarration::FindLine(S.Beats[CurrentBeat].Line);
+	if (!Line)
 	{
-		const AIBNarration::FLine* Line = AIBNarration::FindLine(S.Beats[Index].Line);
-		if (!Line)
-		{
-			continue;
-		}
-		const float Start = S.Starts[Index];
-		const bool bCurrent = Index == CurrentBeat;
-		auto Appear = [this, Start]() { return FMath::Clamp((Elapsed.Get() - Start) / LineFadeTime, 0.f, 1.f); };
-		auto Color = [Appear, bCurrent]()
-		{
-			FLinearColor C = bCurrent ? AIBStyle::Text() : AIBStyle::TextDim();
-			C.A = bCurrent ? Appear() : 0.85f;
-			return FSlateColor(C);
-		};
-		auto Rise = [Appear]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, (1.f - Appear()) * 10.f))); };
-
-		if (bFullscreen)
-		{
-			Lines->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 3.f)
-			[
-				SNew(STextBlock)
-				.Text(Line->Text)
-				.Font(AIBStyle::BodyMedium(bCurrent ? 28 : 24))
-				.Justification(ETextJustify::Center)
-				.WrapTextAt(1120.f)
-				.ShadowOffset(FVector2D(1.5f, 1.5f))
-				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f))
-				.ColorAndOpacity_Lambda(Color)
-				.RenderTransform_Lambda(Rise)
-			];
-			continue;
-		}
-
-		// Rules card: numbered rules, the welcome and closing tip set apart with a dash.
-		const int32 Rule = RuleNumber(S.Beats[Index].Line);
-		Lines->AddSlot().AutoHeight().Padding(0.f, 5.f)
-		[
-			SNew(SHorizontalBox)
-			.RenderTransform_Lambda(Rise)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.f, 1.f, 12.f, 0.f)
-			[
-				SNew(SBox)
-				.WidthOverride(24.f)
-				.HAlign(HAlign_Center)
-				[
-					SNew(STextBlock)
-					.Font(AIBStyle::Title(Rule > 0 ? 24 : 20))
-					.Text(Rule > 0 ? FText::AsNumber(Rule) : FText::FromString(TEXT("-")))
-					.ColorAndOpacity_Lambda([Appear, bCurrent]()
-					{
-						FLinearColor C = AIBStyle::Gold();
-						C.A = bCurrent ? Appear() : 0.55f;
-						return FSlateColor(C);
-					})
-				]
-			]
-			+ SHorizontalBox::Slot().FillWidth(1.f)
-			[
-				SNew(STextBlock)
-				.Text(Line->Text)
-				.Font(Rule > 0 ? AIBStyle::Body(17) : AIBStyle::BodyMedium(18))
-				.AutoWrapText(true)
-				.ColorAndOpacity_Lambda(Color)
-			]
-		];
+		return;
 	}
+	const float Start = S.Starts[CurrentBeat];
+	auto Appear = [this, Start]() { return FMath::Clamp((Elapsed.Get() - Start) / LineFadeTime, 0.f, 1.f); };
+	auto Color = [Appear](const FLinearColor& Base)
+	{
+		return TAttribute<FSlateColor>::CreateLambda([Appear, Base]()
+		{
+			FLinearColor C = Base;
+			C.A *= Appear();
+			return FSlateColor(C);
+		});
+	};
+	auto Rise = [Appear]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, (1.f - Appear()) * 10.f))); };
+
+	if (bFullscreen)
+	{
+		Lines->AddSlot().AutoHeight().HAlign(HAlign_Center)
+		[
+			SNew(STextBlock)
+			.Text(Line->Text)
+			.Font(AIBStyle::BodyMedium(29))
+			.Justification(ETextJustify::Center)
+			.WrapTextAt(1120.f)
+			.LineHeightPercentage(1.08f)
+			.ShadowOffset(FVector2D(1.5f, 1.5f))
+			.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f))
+			.ColorAndOpacity(Color(AIBStyle::Text()))
+			.RenderTransform_Lambda(Rise)
+		];
+		return;
+	}
+
+	// Rules card: the rule's number beside the sentence (the welcome and closing tip get a dash).
+	const int32 Rule = RuleNumber(S.Beats[CurrentBeat].Line);
+	Lines->AddSlot().AutoHeight().Padding(0.f, 4.f)
+	[
+		SNew(SHorizontalBox)
+		.RenderTransform_Lambda(Rise)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.f, 0.f, 12.f, 0.f)
+		[
+			SNew(SBox)
+			.WidthOverride(26.f)
+			.HAlign(HAlign_Center)
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Title(Rule > 0 ? 30 : 24))
+				.Text(Rule > 0 ? FText::AsNumber(Rule) : FText::FromString(TEXT("-")))
+				.ColorAndOpacity(Color(AIBStyle::Gold()))
+			]
+		]
+		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+		[
+			SNew(STextBlock)
+			.Text(Line->Text)
+			.Font(AIBStyle::BodyMedium(19))
+			.AutoWrapText(true)
+			.ColorAndOpacity(Color(AIBStyle::Text()))
+		]
+	];
 }
 
 #undef LOCTEXT_NAMESPACE
