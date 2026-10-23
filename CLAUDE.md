@@ -15,3 +15,9 @@ High-quality third-person game built in Unreal Engine 5.8 (Blueprint project, st
 ## Characters
 - Player character: **Survival Character** by Arberry (Fab).
 - Environment: **Modular Post Apocalyptic Desert** by JustB Studios (Fab).
+
+## Current setup
+- `BP_AlicePlayer` (`Blueprints/Core`): child of template `BP_ThirdPersonCharacter`, mesh `SK_Survival_Character`, anim `ABP_Quinn` from the Survival pack demo.
+- `BP_AliceGameMode` (`Blueprints/Core`): default pawn `BP_AlicePlayer`. Set as global default game mode.
+- `L_Desert_Main` (`Maps`): copy of the desert pack's `PostApo` level; editor startup + game default map. Git-ignored (derived from licensed content), recreate it by duplicating `/Game/JustBStudios/PostApo/Levels/PostApo`.
+- Fab packs currently sit at `Content/Survival_Character/` and `Content/JustBStudios/` (git-ignored). Moving them into `ThirdParty/Fab/` must be done in the editor with redirector fix-up.
