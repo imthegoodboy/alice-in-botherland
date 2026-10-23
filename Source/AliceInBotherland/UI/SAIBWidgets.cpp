@@ -2,6 +2,7 @@
 
 #include "UI/SAIBWidgets.h"
 #include "UI/AIBStyle.h"
+#include "UI/SAIBGameUI.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
@@ -83,20 +84,28 @@ void SAIBButton::Construct(const FArguments& InArgs)
 			.IsFocusable(false)
 			[
 				SNew(SOverlay)
+				// Slanted face and outline (same look as the menus' game buttons); the label stays upright.
 				+ SOverlay::Slot()
 				[
-					SNew(SBorder)
-					.BorderImage(AIBStyle::RoundBrush(6.f))
-					.BorderBackgroundColor(this, &SAIBButton::GetFill)
-					.Padding(0.f)
+					SNew(SBox)
+					.RenderTransformPivot(FVector2D(0.5f, 0.5f))
+					.RenderTransform(FSlateRenderTransform(FShear2D(-0.16f, 0.f)))
+					[
+						SNew(SOverlay)
+						+ SOverlay::Slot()
+						[
+							SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(this, &SAIBButton::GetFill).Padding(0.f)
+						]
+						+ SOverlay::Slot()
+						[
+							SNew(SBorder).BorderImage(AIBStyle::OutlineBrush(FLinearColor::White, 0.f, 1.5f)).BorderBackgroundColor(this, &SAIBButton::GetBorder).Padding(0.f)
+						]
+					]
 				]
-				+ SOverlay::Slot()
+				+ SOverlay::Slot().Padding(FMargin(bGhost ? 12.f : 26.f, 8.f)).VAlign(VAlign_Center)
 				[
-					SNew(SBorder)
-					.BorderImage(AIBStyle::OutlineBrush(FLinearColor::White, 6.f, 1.5f))
-					.BorderBackgroundColor(this, &SAIBButton::GetBorder)
-					.Padding(FMargin(bGhost ? 8.f : 22.f, 8.f))
-					.VAlign(VAlign_Center)
+					SNew(SBox)
+					.RenderTransform_Lambda([this]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(4.f * Hover, 0.f))); })
 					[
 						Row
 					]
@@ -271,11 +280,25 @@ namespace AIBUI
 {
 	TSharedRef<SWidget> Panel(TSharedRef<SWidget> Content, const FMargin& Padding, bool bSolid)
 	{
-		return SNew(SBorder)
-			.BorderImage(bSolid ? AIBStyle::PanelSolidBrush() : AIBStyle::PanelBrush())
-			.Padding(Padding)
+		// The game's frame: flat dark glass, a faint outline and gold corner brackets.
+		return SNew(SOverlay)
+			+ SOverlay::Slot()
 			[
-				Content
+				SNew(SBorder)
+				.BorderImage(AIBStyle::WhiteBrush())
+				.BorderBackgroundColor(FLinearColor(0.012f, 0.013f, 0.018f, bSolid ? 0.92f : 0.76f))
+				.Padding(Padding)
+				[
+					Content
+				]
+			]
+			+ SOverlay::Slot()
+			[
+				SNew(SBorder).Visibility(EVisibility::HitTestInvisible).BorderImage(AIBStyle::OutlineBrush(FLinearColor::White, 0.f, 1.f)).BorderBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.07f))
+			]
+			+ SOverlay::Slot()
+			[
+				SNew(SAIBCorners).Color(FLinearColor(1.f, 0.74f, 0.32f, 0.75f)).Length(16.f)
 			];
 	}
 

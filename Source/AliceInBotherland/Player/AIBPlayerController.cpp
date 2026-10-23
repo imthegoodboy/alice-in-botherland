@@ -9,6 +9,7 @@
 #include "Core/AIBGameInstance.h"
 #include "Audio/AIBAudioSubsystem.h"
 #include "Audio/AIBNarration.h"
+#include "AliceInBotherland.h"
 #include "UI/AIBStyle.h"
 #include "OnlineSubsystemUtils.h"
 #include "Interfaces/VoiceInterface.h"
@@ -491,6 +492,7 @@ void AAIBPlayerController::TogglePauseMenu()
 
 void AAIBPlayerController::LeaveMatch()
 {
+	UE_LOG(LogAIB, Log, TEXT("Leaving the match for the main menu (phase %s)"), GetAIBGameState() ? *UEnum::GetValueAsString(GetAIBGameState()->Phase) : TEXT("?"));
 	if (UAIBSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UAIBSessionSubsystem>())
 	{
 		Sessions->LeaveToMenu();

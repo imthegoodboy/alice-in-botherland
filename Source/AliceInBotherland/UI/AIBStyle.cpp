@@ -66,6 +66,13 @@ namespace AIBStyle
 	FSlateFontInfo BodyMedium(int32 Size) { return MakeFont(TEXT("Barlow-Medium.ttf"), TEXT("Regular"), Size); }
 	FSlateFontInfo Story(int32 Size) { return MakeFont(TEXT("Cinzel-Regular.ttf"), TEXT("Regular"), Size); }
 	FSlateFontInfo StoryBold(int32 Size) { return MakeFont(TEXT("Cinzel-Bold.ttf"), TEXT("Bold"), Size); }
+	FSlateFontInfo IconFont(int32 Size) { return MakeFont(TEXT("MaterialIcons-Regular.ttf"), TEXT("Regular"), Size); }
+
+	FSlateFontInfo Spaced(FSlateFontInfo Font, int32 LetterSpacing)
+	{
+		Font.LetterSpacing = LetterSpacing;
+		return Font;
+	}
 
 	FLinearColor Ink() { return FLinearColor(0.004f, 0.004f, 0.006f, 1.f); }
 	FLinearColor Panel() { return FLinearColor(0.01f, 0.011f, 0.014f, 0.82f); }
@@ -78,6 +85,8 @@ namespace AIBStyle
 	FLinearColor Text() { return FLinearColor(0.93f, 0.91f, 0.87f, 1.f); }
 	FLinearColor TextDim() { return FLinearColor(0.62f, 0.6f, 0.57f, 1.f); }
 	FLinearColor TextFaint() { return FLinearColor(0.38f, 0.37f, 0.36f, 1.f); }
+	FLinearColor Glass() { return FLinearColor(0.012f, 0.013f, 0.018f, 0.72f); }
+	FLinearColor Ember() { return FLinearColor(1.f, 0.36f, 0.12f, 1.f); }
 
 	const FSlateBrush* PanelBrush()
 	{

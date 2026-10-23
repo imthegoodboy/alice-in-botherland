@@ -17,6 +17,7 @@ public:
 };
 
 class UAIBGameInstance;
+class SVerticalBox;
 
 class ALICEINBOTHERLAND_API SAIBSettingsPanel : public SCompoundWidget
 {
@@ -30,14 +31,22 @@ public:
 	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 private:
-	enum class EFormat : uint8 { Percent, Value, Degrees };
-	TSharedRef<SWidget> MakeSlider(const FText& Label, float FAIBSettings::* Field, float Min, float Max, EFormat Format);
-	TSharedRef<SWidget> MakeToggle(const FText& Label, bool FAIBSettings::* Field);
-	TSharedRef<SWidget> MakeChoiceRow(const FText& Label, int32 FAIBSettings::* Field, TArray<FText> Names);
+	enum class EFormat : uint8 { Percent, Value, Degrees, Whole };
+	TSharedRef<SWidget> MakeAudioTab();
+	TSharedRef<SWidget> MakeVoiceTab();
+	TSharedRef<SWidget> MakeControlsTab();
+	TSharedRef<SWidget> MakeGraphicsTab();
+	TSharedRef<SWidget> MakePage(const FText& Title, const FText& Description, TSharedRef<SVerticalBox> Rows);
+	TSharedRef<SWidget> MakeRow(const FText& Label, const FText& Help, TSharedRef<SWidget> Control);
+	TSharedRef<SWidget> MakeSlider(const FText& Label, const FText& Help, float FAIBSettings::* Field, float Min, float Max, float Step, EFormat Format);
+	TSharedRef<SWidget> MakeToggle(const FText& Label, const FText& Help, bool FAIBSettings::* Field);
+	TSharedRef<SWidget> MakeChoice(const FText& Label, const FText& Help, int32 FAIBSettings::* Field, TArray<FText> Names);
 	void Commit(bool bSave);
+	void ResetDefaults();
 
 	TWeakObjectPtr<UAIBGameInstance> GameInstance;
 	FAIBSettings Working;
 	FSimpleDelegate OnClose;
 	double LastTick = -1.0;
+	int32 Tab = 0;
 };

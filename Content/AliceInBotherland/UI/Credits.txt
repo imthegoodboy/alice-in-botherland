@@ -30,13 +30,14 @@ Some tracks were shortened with a fade-out and loudness-normalized.
 
 
 VOICES & SOUND
-Narrator and Guardian voices generated with ElevenLabs (elevenlabs.io) - voices "George" and "Brian".
+Narrator voices generated with ElevenLabs (elevenlabs.io) - Alice, the story narrator, and the voices "George" and "Brian".
 Ambient and cinematic sound effects generated with ElevenLabs; interface sounds synthesized for this game.
 
 
 FONTS
 Bebas Neue, Barlow, Barlow Condensed, Cinzel, Noto Sans Symbols 2 - SIL Open Font License 1.1
-Community crests from Google Material Icons - Apache License 2.0
+Community crests and interface icons from Google Material Icons - Apache License 2.0
+Story artwork generated with OpenAI image models for this game
 
 
 Inspired by the tension of "Alice in Borderland".

@@ -45,7 +45,7 @@ void UAIBGameInstance::Init()
 void UAIBGameInstance::OnStart()
 {
 	Super::OnStart();
-	UE_LOG(LogAIB, Log, TEXT("Alice in Botherland: The Last Island v1.1.0"));
+	UE_LOG(LogAIB, Log, TEXT("Alice in Botherland: The Last Island v1.2.0 build 3"));
 
 	// Settings are applied here rather than in Init: scalability changes are ignored until the engine is initialized.
 	// First launch on this PC (or new defaults): let the engine pick sensible graphics settings for the hardware.
@@ -129,6 +129,16 @@ void UAIBGameInstance::ApplySettings()
 	if (GIsEditor)
 	{
 		return;
+	}
+	if (GEngine)
+	{
+		GEngine->DisplayGamma = 2.2f * FMath::Clamp(S.Brightness, 0.7f, 1.3f);
+		const float Caps[] = { 30.f, 60.f, 120.f, 0.f };
+		GEngine->SetMaxFPS(Caps[FMath::Clamp(S.FrameRateIndex, 0, 3)]);
+	}
+	if (IConsoleVariable* MotionBlur = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MotionBlurQuality")))
+	{
+		MotionBlur->Set(S.bMotionBlur ? 4 : 0, ECVF_SetByGameSetting);
 	}
 	if (UGameUserSettings* UserSettings = UGameUserSettings::GetGameUserSettings())
 	{

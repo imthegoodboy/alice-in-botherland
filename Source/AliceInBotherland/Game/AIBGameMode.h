@@ -72,6 +72,8 @@ protected:
 	void StartCountdown();
 	/** Room codes from the host's LAN and public addresses. */
 	void UpdateRoomCodes();
+	float NextRoomCodeTry = 0.f;
+	bool bFetchingPublicAddress = false;
 	void BeginMatch();
 	void ResetToLobby();
 	void HandleGhosts();

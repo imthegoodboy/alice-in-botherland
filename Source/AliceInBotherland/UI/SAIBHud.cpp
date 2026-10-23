@@ -3,6 +3,7 @@
 #include "UI/SAIBHud.h"
 #include "UI/AIBStyle.h"
 #include "UI/SAIBWidgets.h"
+#include "UI/SAIBGameUI.h"
 #include "UI/SAIBLoadingScreen.h"
 #include "UI/SAIBStoryCards.h"
 #include "Player/AIBPlayerController.h"
@@ -19,6 +20,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SBackgroundBlur.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
@@ -210,10 +212,10 @@ void SAIBHud::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)
 		.Padding(TAttribute<FMargin>::CreateLambda([this]()
 		{
-			// In the lobby the Gathering panel fills the left column, so the chat moves beside it.
+			// In the room the start column fills the bottom left, so the chat sits above it.
 			const EAIBPhase P = Phase();
 			const bool bLobby = P == EAIBPhase::Lobby || P == EAIBPhase::LobbyCountdown;
-			return FMargin(bLobby ? 700.f : 24.f, 0.f, 0.f, 24.f);
+			return bLobby ? FMargin(84.f, 0.f, 0.f, 360.f) : FMargin(24.f, 0.f, 0.f, 24.f);
 		}))
 		[MakeChat()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom)
@@ -226,8 +228,27 @@ void SAIBHud::Construct(const FArguments& InArgs)
 		}))
 		[MakeSubtitles()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top)
-		.Padding(TAttribute<FMargin>::CreateLambda([this]() { return FMargin(0.f, Phase() == EAIBPhase::IslandExplore ? 160.f : 130.f, 28.f, 0.f); }))
+		.Padding(TAttribute<FMargin>::CreateLambda([this]() { return FMargin(0.f, Phase() == EAIBPhase::IslandExplore ? 250.f : 130.f, 28.f, 0.f); }))
 		[MakeToasts()]
+		// Menu / settings button (Esc does the same); the room has its own row of buttons.
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 18.f, 24.f, 0.f)
+		[
+			SNew(SBox)
+			.Visibility_Lambda([this]()
+			{
+				const EAIBPhase P = Phase();
+				const bool bRoom = P == EAIBPhase::Lobby || P == EAIBPhase::LobbyCountdown || P == EAIBPhase::None;
+				return bPauseOpen || bRoom ? EVisibility::Collapsed : EVisibility::Visible;
+			})
+			[
+				SNew(SAIBIconButton)
+				.Icon(AIBIcon::Settings)
+				.Label(LOCTEXT("MenuButton", "MENU  ESC"))
+				.Size(46.f)
+				.OnClicked_Lambda([this]() { TogglePause(); return FReply::Handled(); })
+			]
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(10.f, 8.f, 0.f, 0.f)[SNew(SAIBFpsCounter)]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 28.f, 24.f)[MakeHints()]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 36.f)[MakeSpectatorBar()]
 		+ SOverlay::Slot()[MakeScoreboard()]
@@ -374,6 +395,10 @@ void SAIBHud::TogglePause()
 	if (!bPauseOpen)
 	{
 		FSlateApplication::Get().SetAllUserFocusToGameViewport();
+		if (UAIBGameInstance* GI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr)
+		{
+			GI->SaveProfile();
+		}
 	}
 }
 
@@ -1068,7 +1093,7 @@ TSharedRef<SWidget> SAIBHud::MakeExplorePanel()
 	return SNew(SOverlay)
 		.Visibility_Lambda([this]() { return Phase() == EAIBPhase::IslandExplore && !bScoreboard ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 		// Objective.
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 26.f, 28.f, 0.f)
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 116.f, 28.f, 0.f)
 		[
 			SNew(SBox)
 			.WidthOverride(340.f)
@@ -1251,100 +1276,261 @@ TSharedRef<SWidget> SAIBHud::MakeRules(bool bCompact)
 
 TSharedRef<SWidget> SAIBHud::MakePauseMenu()
 {
-	UAIBGameInstance* GI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr;
+	TWeakObjectPtr<UAIBGameInstance> WeakGI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr;
+	// Quick settings change the live profile directly (the controller re-applies them every frame); the profile is
+	// saved when the menu closes.
+	auto Live = [WeakGI]() -> FAIBSettings* { return WeakGI.IsValid() ? &WeakGI->GetProfile()->Settings : nullptr; };
+	auto Apply = [WeakGI]() { if (WeakGI.IsValid()) WeakGI->ApplySettings(); };
+
+	auto QuickRow = [](const FText& Label, TSharedRef<SWidget> Control)
+	{
+		return SNew(SBox)
+			.Padding(FMargin(0.f, 3.f))
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::WhiteBrush())
+				.BorderBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.035f))
+				.Padding(FMargin(18.f, 10.f))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(Label).Font(AIBStyle::BodyMedium(18)).ColorAndOpacity(AIBStyle::Text())
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Control]
+				]
+			];
+	};
+	auto QuickSlider = [Live, Apply](float FAIBSettings::* Field, float Min, float Max, float Step, bool bPercent)
+	{
+		return SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SAIBSlider)
+				.Width(230.f)
+				.MinValue(Min)
+				.MaxValue(Max)
+				.StepSize(Step)
+				.Value_Lambda([Live, Field]() { const FAIBSettings* S = Live(); return S ? S->*Field : 0.f; })
+				.OnValueChanged_Lambda([Live, Apply, Field](float Value) { if (FAIBSettings* S = Live()) { S->*Field = Value; Apply(); } })
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(70.f).HAlign(HAlign_Right)
+				[
+					SNew(STextBlock)
+					.Font(AIBStyle::Title(26))
+					.ColorAndOpacity(AIBStyle::Gold())
+					.Text_Lambda([Live, Field, bPercent]()
+					{
+						const FAIBSettings* S = Live();
+						const float Value = S ? S->*Field : 0.f;
+						return bPercent ? FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(Value * 100.f))) : FText::FromString(Value >= 10.f ? FString::Printf(TEXT("%.0f"), Value) : FString::Printf(TEXT("%.2f"), Value));
+					})
+				]
+			];
+	};
+	TSharedRef<SHorizontalBox> MicChoices = SNew(SHorizontalBox);
+	const FText MicNames[] = { LOCTEXT("QMicOff", "OFF"), LOCTEXT("QMicPtt", "HOLD V"), LOCTEXT("QMicOpen", "ON") };
+	for (int32 Choice = 0; Choice < 3; ++Choice)
+	{
+		MicChoices->AddSlot().AutoWidth().Padding(3.f, 0.f)
+		[
+			SNew(SAIBSlantButton)
+			.Text(MicNames[Choice])
+			.FontSize(15)
+			.Height(38.f)
+			.MinWidth(92.f)
+			.Centered(true)
+			.IsSelected_Lambda([Live, Choice]() { const FAIBSettings* S = Live(); return S && S->MicMode == Choice; })
+			.OnClicked_Lambda([Live, Apply, Choice]() { if (FAIBSettings* S = Live()) { S->MicMode = Choice; Apply(); } return FReply::Handled(); })
+		];
+	}
+
+	TSharedRef<SWidget> QuickSettings = SNew(SBox)
+		.WidthOverride(640.f)
+		[
+			AIBUI::Frame(
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 12.f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)[AIBUI::Icon(AIBIcon::Tune, 28, AIBStyle::Gold())]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(LOCTEXT("QuickTitle", "QUICK SETTINGS")).Font(AIBStyle::Spaced(AIBStyle::Title(36), 40)).ColorAndOpacity(AIBStyle::Text())
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QSens", "Mouse sensitivity"), QuickSlider(&FAIBSettings::MouseSensitivity, 0.2f, 3.f, 0.05f, false))]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QFov", "Field of view"), QuickSlider(&FAIBSettings::FieldOfView, 60.f, 110.f, 1.f, false))]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QMaster", "Master volume"), QuickSlider(&FAIBSettings::MasterVolume, 0.f, 1.f, 0.01f, true))]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QVoice", "Narrator voice"), QuickSlider(&FAIBSettings::VoiceVolume, 0.f, 1.f, 0.01f, true))]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QMic", "Microphone"), MicChoices)]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					QuickRow(LOCTEXT("QCaptions", "Captions"),
+						SNew(SAIBToggle)
+						.IsOn_Lambda([Live]() { const FAIBSettings* S = Live(); return S && S->bSubtitles; })
+						.OnToggled_Lambda([Live, Apply](bool bOn) { if (FAIBSettings* S = Live()) { S->bSubtitles = bOn; Apply(); } }))
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 12.f, 0.f, 0.f)
+				[
+					SNew(SAIBSlantButton).Kind(EAIBButtonKind::Ghost).Icon(AIBIcon::Settings).Text(LOCTEXT("AllSettings", "ALL SETTINGS")).FontSize(17).Height(42.f)
+					.OnClicked_Lambda([this]() { bSettingsOpen = true; return FReply::Handled(); })
+				],
+				FMargin(28.f, 24.f), FLinearColor(1.f, 0.74f, 0.32f, 0.9f), 0.86f)
+		];
+
+	auto MenuButton = [](TCHAR Glyph, const FText& Text, EAIBButtonKind Kind, TFunction<void()> Action)
+	{
+		return SNew(SAIBSlantButton)
+			.Kind(Kind)
+			.Icon(Glyph)
+			.Text(Text)
+			.FontSize(Kind == EAIBButtonKind::Primary ? 34 : 26)
+			.Height(Kind == EAIBButtonKind::Primary ? 88.f : 70.f)
+			.MinWidth(470.f)
+			.Shine(Kind == EAIBButtonKind::Primary)
+			.OnClicked_Lambda([Action]() { Action(); return FReply::Handled(); });
+	};
+
+	TSharedRef<SWidget> Menu = SNew(SBox)
+		.WidthOverride(480.f)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f)
+			[
+				SNew(SAIBReveal)[AIBUI::PageTitle(LOCTEXT("MenuKicker", "THE MATCH GOES ON"), LOCTEXT("Paused", "MENU"), 92)]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 22.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("MenuNote", "The other champions keep playing while this menu is open."))
+				.Font(AIBStyle::Body(15)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
+			[
+				SNew(SAIBReveal).Delay(0.05f)[MenuButton(AIBIcon::Play, LOCTEXT("Resume", "RESUME"), EAIBButtonKind::Primary, [this]() { TogglePause(); })]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
+			[
+				SNew(SAIBReveal).Delay(0.1f)[MenuButton(AIBIcon::Settings, LOCTEXT("SettingsBtn", "SETTINGS"), EAIBButtonKind::Secondary, [this]() { bSettingsOpen = true; })]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
+			[
+				SNew(SAIBReveal).Delay(0.15f)[MenuButton(AIBIcon::Book, LOCTEXT("HowTo", "HOW TO PLAY"), EAIBButtonKind::Secondary, [this]() { bRulesOpen = true; })]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
+			[
+				SNew(SAIBReveal).Delay(0.2f)
+				[
+					SNew(SAIBSlantButton)
+					.Icon(AIBIcon::Logout)
+					.Text(LOCTEXT("Leave", "LEAVE MATCH"))
+					.SubText_Lambda([this]() { return PC() && PC()->IsHost() ? LOCTEXT("LeaveHost", "Ends the match for everyone") : LOCTEXT("LeaveGuest", "Back to the main menu"); })
+					.AccentColor(AIBStyle::Blood())
+					.FontSize(26)
+					.Height(70.f)
+					.MinWidth(470.f)
+					.OnClicked_Lambda([this]() { if (PC()) PC()->LeaveMatch(); return FReply::Handled(); })
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(30.f, 16.f, 0.f, 0.f)
+			[
+				SNew(STextBlock).Text(LOCTEXT("MenuKeys", "ESC  close menu")).Font(AIBStyle::Spaced(AIBStyle::SubHeading(14), 160)).ColorAndOpacity(AIBStyle::TextFaint())
+			]
+		];
+
+	auto Backdrop = [](float Alpha)
+	{
+		return SNew(SOverlay)
+			+ SOverlay::Slot()[SNew(SBackgroundBlur).BlurStrength(12.f)]
+			+ SOverlay::Slot()[SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, Alpha))]
+			+ SOverlay::Slot()[SNew(SAIBGradient).Vertical(false).Colors({ FLinearColor(0.f, 0.f, 0.f, 0.7f), FLinearColor(0.f, 0.f, 0.f, 0.2f), FLinearColor(0.f, 0.f, 0.f, 0.f) })];
+	};
+
 	return SNew(SBox)
 		.Visibility_Lambda([this]() { return bPauseOpen ? EVisibility::Visible : EVisibility::Collapsed; })
 		[
 			SNew(SOverlay)
+			+ SOverlay::Slot()[Backdrop(0.62f)]
+			// Menu and quick settings.
 			+ SOverlay::Slot()
-			[
-				SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.6f))
-			]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
 				SNew(SBox)
 				.Visibility_Lambda([this]() { return !bSettingsOpen && !bRulesOpen ? EVisibility::Visible : EVisibility::Collapsed; })
-				.WidthOverride(420.f)
 				[
-					AIBUI::Panel(
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 18.f)
-						[
-							SNew(STextBlock).Text(LOCTEXT("Paused", "PAUSED")).Font(AIBStyle::Title(52)).ColorAndOpacity(AIBStyle::Text())
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
-						[
-							SNew(SAIBButton).Text(LOCTEXT("Resume", "RESUME")).Kind(EAIBButtonKind::Primary)
-							.OnClicked_Lambda([this]() { TogglePause(); return FReply::Handled(); })
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
-						[
-							SNew(SAIBButton).Text(LOCTEXT("HowTo", "HOW TO PLAY"))
-							.OnClicked_Lambda([this]() { bRulesOpen = true; return FReply::Handled(); })
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
-						[
-							SNew(SAIBButton).Text(LOCTEXT("SettingsBtn", "SETTINGS"))
-							.OnClicked_Lambda([this]() { bSettingsOpen = true; return FReply::Handled(); })
-						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f)
-						[
-							SNew(SAIBButton).Text(LOCTEXT("Leave", "LEAVE MATCH"))
-							.SubText_Lambda([this]() { return PC() && PC()->IsHost() ? LOCTEXT("LeaveHost", "You are the host - this ends the match for everyone") : FText::GetEmpty(); })
-							.OnClicked_Lambda([this]() { if (PC()) PC()->LeaveMatch(); return FReply::Handled(); })
-						],
-						FMargin(32.f), true)
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(110.f, 0.f, 70.f, 0.f)[Menu]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SAIBReveal).Offset(FVector2D(40.f, 0.f)).Delay(0.15f)[QuickSettings]
+					]
 				]
 			]
+			// Full settings.
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
 				SNew(SBox)
 				.Visibility_Lambda([this]() { return bSettingsOpen ? EVisibility::Visible : EVisibility::Collapsed; })
 				[
-					SNew(SAIBSettingsPanel)
-					.GameInstance(GI)
-					.OnClose_Lambda([this]()
-					{
-						// Opened from the lobby: straight back to it. From the pause menu: back to the menu.
-						bSettingsOpen = false;
-						if (bSettingsOnly)
+					SNew(SAIBReveal).Offset(FVector2D(0.f, 30.f))
+					[
+						SNew(SAIBSettingsPanel)
+						.GameInstance(WeakGI)
+						.OnClose_Lambda([this]()
 						{
-							bSettingsOnly = false;
-							bPauseOpen = false;
-							FSlateApplication::Get().SetAllUserFocusToGameViewport();
-						}
-					})
+							// Opened from the room: straight back to it. From the menu: back to the menu.
+							bSettingsOpen = false;
+							if (bSettingsOnly)
+							{
+								bSettingsOnly = false;
+								bPauseOpen = false;
+								FSlateApplication::Get().SetAllUserFocusToGameViewport();
+							}
+						})
+					]
 				]
 			]
+			// Rules.
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
 				SNew(SBox)
 				.Visibility_Lambda([this]() { return bRulesOpen ? EVisibility::Visible : EVisibility::Collapsed; })
-				.WidthOverride(760.f)
+				.WidthOverride(900.f)
 				[
-					AIBUI::Panel(
-						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()
-						[
-							SNew(STextBlock).Text(LOCTEXT("HowToTitle", "HOW TO PLAY")).Font(AIBStyle::Title(44)).ColorAndOpacity(AIBStyle::Text())
-						]
-						+ SVerticalBox::Slot().AutoHeight()[MakeRules(false)]
-						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 14.f, 0.f, 0.f)
-						[
-							SNew(SAIBButton).Text(LOCTEXT("Back", "BACK")).MinWidth(160.f)
-							.OnClicked_Lambda([this]()
-							{
-								bRulesOpen = false;
-								if (bSettingsOnly)
+					SNew(SAIBReveal).Offset(FVector2D(0.f, 30.f))
+					[
+						AIBUI::Frame(
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
+							[
+								AIBUI::PageTitle(LOCTEXT("RulesKicker", "THE GUARDIAN'S LAW"), LOCTEXT("HowToTitle", "HOW TO PLAY"), 60)
+							]
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								SNew(SBox).MaxDesiredHeight(560.f)
+								[
+									SNew(SScrollBox).ScrollBarThickness(FVector2D(5.f, 5.f)) + SScrollBox::Slot().Padding(0.f, 0.f, 12.f, 0.f)[MakeRules(false)]
+								]
+							]
+							+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 16.f, 0.f, 0.f)
+							[
+								SNew(SAIBSlantButton).Kind(EAIBButtonKind::Primary).Icon(AIBIcon::Back).Text(LOCTEXT("Back", "BACK")).FontSize(22).Height(56.f).MinWidth(200.f)
+								.OnClicked_Lambda([this]()
 								{
-									bSettingsOnly = false;
-									bPauseOpen = false;
-									FSlateApplication::Get().SetAllUserFocusToGameViewport();
-								}
-								return FReply::Handled();
-							})
-						],
-						FMargin(32.f), true)
+									bRulesOpen = false;
+									if (bSettingsOnly)
+									{
+										bSettingsOnly = false;
+										bPauseOpen = false;
+										FSlateApplication::Get().SetAllUserFocusToGameViewport();
+									}
+									return FReply::Handled();
+								})
+							],
+							FMargin(34.f, 28.f), FLinearColor(1.f, 0.74f, 0.32f, 0.9f), 0.92f)
+					]
 				]
 			]
 		];

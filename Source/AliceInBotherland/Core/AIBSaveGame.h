@@ -31,6 +31,12 @@ struct FAIBSettings
 	UPROPERTY() bool bFullscreen = true;
 	UPROPERTY() bool bVSync = true;
 	UPROPERTY() float ResolutionScale = 100.f;
+	/** Picture brightness (display gamma multiplier, 0.7 - 1.3). */
+	UPROPERTY() float Brightness = 1.f;
+	/** Frame rate cap: 0 = 30, 1 = 60, 2 = 120, 3 = unlimited. */
+	UPROPERTY() int32 FrameRateIndex = 3;
+	UPROPERTY() bool bMotionBlur = true;
+	UPROPERTY() bool bShowFPS = false;
 };
 
 UCLASS()

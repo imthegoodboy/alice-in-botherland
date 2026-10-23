@@ -3,6 +3,7 @@
 #include "UI/SAIBHud.h"
 #include "UI/AIBStyle.h"
 #include "UI/SAIBWidgets.h"
+#include "UI/SAIBGameUI.h"
 #include "Player/AIBPlayerController.h"
 #include "Player/AIBVehicle.h"
 #include "Game/AIBGameState.h"
@@ -82,274 +83,272 @@ TSharedRef<SWidget> SAIBHud::MakeLobbyPanel()
 		}
 		return bShowInternetCode && !G->RoomCodeInternet.IsEmpty() ? G->RoomCodeInternet : G->RoomCode;
 	};
+	auto MicMode = [this]()
+	{
+		UAIBGameInstance* GI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr;
+		return GI ? GI->GetSettings().MicMode : 1;
+	};
 
-	// Seats: one card per community.
-	TSharedRef<SVerticalBox> Seats = SNew(SVerticalBox);
+	// Champion cards: one per community, across the bottom.
+	TSharedRef<SHorizontalBox> Cards = SNew(SHorizontalBox);
 	for (int32 Slot = 0; Slot < AIB::MaxPlayers; ++Slot)
 	{
 		auto Seat = [this, Slot]() -> AAIBPlayerState* { const AAIBGameState* G = GS(); return G ? G->GetPlayerBySlot(Slot) : nullptr; };
 		const FLinearColor Color = AIB::Community(Slot).Color;
-		auto SeatColor = [Seat, Color]() { return FSlateColor(Seat() ? Color : Color * FLinearColor(1.f, 1.f, 1.f, 0.35f)); };
-		Seats->AddSlot().AutoHeight().Padding(0.f, 3.f)
+		auto IsMe = [this, Seat]() { return Seat() && Seat() == MyPS(); };
+		auto StatusText = [this, Seat]()
+		{
+			const AAIBPlayerState* PS = Seat();
+			if (!PS) return LOCTEXT("SeatOpen", "WAITING");
+			if (PS->bDisconnected) return FText::Format(LOCTEXT("SeatReconnect", "RECONNECTING {0}"), AIBStyle::Clock(PS->ReconnectDeadline - ServerNow()));
+			if (PS->bBot) return LOCTEXT("SeatAI", "AI READY");
+			if (PS->bHost && !PS->bReady) return LOCTEXT("SeatHost", "HOST");
+			return PS->bReady ? LOCTEXT("SeatReady", "READY") : LOCTEXT("SeatNotReady", "NOT READY");
+		};
+		auto StatusColor = [Seat]()
+		{
+			const AAIBPlayerState* PS = Seat();
+			if (!PS) return FSlateColor(AIBStyle::TextFaint());
+			if (PS->bDisconnected) return FSlateColor(AIBStyle::Gold());
+			if (PS->bHost && !PS->bReady) return FSlateColor(AIBStyle::Gold());
+			return FSlateColor(PS->bReady || PS->bBot ? AIBStyle::Acid() : AIBStyle::Blood());
+		};
+
+		Cards->AddSlot().AutoWidth().Padding(6.f, 0.f)
 		[
-			SNew(SBorder)
-			.BorderImage(AIBStyle::CardBrush())
-			.BorderBackgroundColor_Lambda([Seat]() { return FSlateColor(FLinearColor(1.f, 1.f, 1.f, Seat() ? 1.f : 0.55f)); })
-			.Padding(FMargin(0.f, 0.f, 12.f, 0.f))
+			SNew(SAIBReveal).Offset(FVector2D(0.f, 50.f)).Delay(0.08f * Slot)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()
+				SNew(SBox)
+				.WidthOverride(212.f)
+				.HeightOverride(322.f)
 				[
-					SNew(SBox).WidthOverride(4.f).HeightOverride(58.f)
+					SNew(SOverlay)
+					+ SOverlay::Slot()
 					[
-						SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor_Lambda(SeatColor)
+						SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor_Lambda([Seat]() { return FSlateColor(FLinearColor(0.012f, 0.013f, 0.018f, Seat() ? 0.82f : 0.55f)); })
 					]
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.f, 0.f)
-				[
-					SNew(SBox).WidthOverride(34.f).HeightOverride(34.f)
+					// Community colour washing down from the top.
+					+ SOverlay::Slot().VAlign(VAlign_Top)
 					[
-						SNew(SImage).Image(AIBStyle::CrestBrush(Slot)).ColorAndOpacity_Lambda(SeatColor)
+						SNew(SBox)
+						.HeightOverride(190.f)
+						.Visibility_Lambda([Seat]() { return Seat() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						[
+							SNew(SAIBGradient).Colors({ FLinearColor(Color.R, Color.G, Color.B, 0.5f), FLinearColor(Color.R, Color.G, Color.B, 0.f) })
+						]
 					]
-				]
-				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
-				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()
+					+ SOverlay::Slot().VAlign(VAlign_Top)
+					[
+						SNew(SBox).HeightOverride(4.f)
+						[
+							SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor_Lambda([Seat, Color]() { return FSlateColor(FLinearColor(Color.R, Color.G, Color.B, Seat() ? 1.f : 0.3f)); })
+						]
+					]
+					+ SOverlay::Slot()
+					[
+						SNew(SBorder)
+						.Visibility(EVisibility::HitTestInvisible)
+						.BorderImage(AIBStyle::OutlineBrush(FLinearColor::White, 0.f, 1.f))
+						.BorderBackgroundColor_Lambda([IsMe, Seat, Color]()
+						{
+							return FSlateColor(IsMe() ? AIBStyle::Gold() : FLinearColor(Color.R, Color.G, Color.B, Seat() ? 0.45f : 0.15f));
+						})
+					]
+					+ SOverlay::Slot()
+					[
+						SNew(SBox).Visibility_Lambda([IsMe]() { return IsMe() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						[
+							SNew(SAIBCorners).Color(AIBStyle::Gold()).Length(24.f).Thickness(3.f)
+						]
+					]
+					// Crest.
+					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 34.f, 0.f, 0.f)
+					[
+						SNew(SBox).WidthOverride(92.f).HeightOverride(92.f)
+						[
+							SNew(SImage).Image(AIBStyle::CrestBrush(Slot)).ColorAndOpacity_Lambda([Seat, Color]() { return FSlateColor(Seat() ? Color : FLinearColor(Color.R, Color.G, Color.B, 0.22f)); })
+						]
+					]
+					// YOU / AI / talking (top left), remove (top right).
+					+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(12.f, 14.f, 0.f, 0.f)
 					[
 						SNew(SHorizontalBox)
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
-							SNew(STextBlock)
-							.Font(AIBStyle::Heading(21))
-							.Text_Lambda([this, Seat]()
-							{
-								const AAIBPlayerState* PS = Seat();
-								if (!PS)
-								{
-									return LOCTEXT("OpenSeat", "OPEN SEAT");
-								}
-								return FText::FromString(PS->GetPlayerName().ToUpper() + (PS == MyPS() ? TEXT("  (YOU)") : TEXT("")));
-							})
-							.ColorAndOpacity_Lambda([Seat]() { return FSlateColor(Seat() ? AIBStyle::Text() : AIBStyle::TextFaint()); })
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f, 0.f, 0.f, 0.f)
-						[
-							SNew(SBorder)
-							.Visibility_Lambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && (PS->bHost || PS->bBot) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-							.BorderImage(AIBStyle::OutlineBrush(FLinearColor(1.f, 1.f, 1.f, 0.35f), 4.f, 1.f))
-							.Padding(FMargin(6.f, 0.f))
+							SNew(SBox).Visibility_Lambda([IsMe]() { return IsMe() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 							[
-								SNew(STextBlock)
-								.Font(AIBStyle::SubHeading(12))
-								.ColorAndOpacity(AIBStyle::TextDim())
-								.Text_Lambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && PS->bHost ? LOCTEXT("HostTag", "HOST") : LOCTEXT("AITag", "AI"); })
+								AIBUI::Pill(LOCTEXT("YouTag", "YOU"), AIBStyle::Gold(), 12)
 							]
 						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f, 0.f, 0.f, 0.f)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4.f, 0.f, 0.f, 0.f)
 						[
-							AIBUI::TalkDot(TAttribute<bool>::CreateLambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && PS->bTalking; }))
+							SNew(SBox).Visibility_Lambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && (PS->bBot || PS->bHost) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+							[
+								AIBUI::Pill(TAttribute<FText>::CreateLambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && PS->bHost ? LOCTEXT("HostTag", "HOST") : LOCTEXT("AITag", "AI"); }), AIBStyle::Text(), 12)
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.f, 0.f, 0.f, 0.f)
+						[
+							SNew(SBox).Visibility_Lambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS && PS->bTalking ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+							[
+								AIBUI::Icon(AIBIcon::Mic, 20, TAttribute<FSlateColor>::CreateLambda([]() { FLinearColor C = AIBStyle::Acid(); C.A = 0.6f + 0.4f * FMath::Sin(FPlatformTime::Seconds() * 9.0); return FSlateColor(C); }))
+							]
 						]
 					]
-					+ SVerticalBox::Slot().AutoHeight()
+					+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 8.f, 8.f, 0.f)
 					[
-						SNew(STextBlock)
-						.Font(AIBStyle::Body(13))
-						.ColorAndOpacity(Color * FLinearColor(1.f, 1.f, 1.f, 0.85f))
-						.Text(FText::Format(LOCTEXT("SeatCommunity", "{0}  -  {1}"), AIB::Community(Slot).Name, AIB::Community(Slot).ShipName))
+						SNew(SBox)
+						.Visibility_Lambda([this, Seat]()
+						{
+							const AAIBPlayerState* PS = Seat();
+							return PC() && PC()->IsHost() && PS && PS != MyPS() && Phase() == EAIBPhase::Lobby ? EVisibility::Visible : EVisibility::Collapsed;
+						})
+						[
+							SNew(SAIBIconButton).Icon(AIBIcon::Close).Size(30.f)
+							.OnClicked_Lambda([this, Slot]() { if (PC()) PC()->ServerRemoveSeat(Slot); return FReply::Handled(); })
+						]
 					]
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f, 0.f)
-				[
-					SNew(STextBlock)
-					.Font(AIBStyle::Heading(16))
-					.Text_Lambda([this, Seat]()
-					{
-						const AAIBPlayerState* PS = Seat();
-						if (!PS) return LOCTEXT("Waiting", "WAITING...");
-						if (PS->bDisconnected) return FText::Format(LOCTEXT("SeatReconnect", "RECONNECTING {0}"), AIBStyle::Clock(PS->ReconnectDeadline - ServerNow()));
-						if (PS->bBot) return LOCTEXT("SeatAI", "READY");
-						if (PS->bHost && !PS->bReady) return FText::GetEmpty();
-						return PS->bReady ? LOCTEXT("SeatReady", "READY") : LOCTEXT("SeatNotReady", "NOT READY");
-					})
-					.ColorAndOpacity_Lambda([Seat]()
-					{
-						const AAIBPlayerState* PS = Seat();
-						if (!PS) return FSlateColor(AIBStyle::TextFaint());
-						if (PS->bDisconnected) return FSlateColor(AIBStyle::Gold());
-						return FSlateColor(PS->bReady || PS->bBot ? AIBStyle::Acid() : AIBStyle::Blood());
-					})
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-				[
-					SNew(SBox)
-					.Visibility_Lambda([this, Seat]()
-					{
-						const AAIBPlayerState* PS = Seat();
-						return PC() && PC()->IsHost() && PS && PS != MyPS() && Phase() == EAIBPhase::Lobby ? EVisibility::Visible : EVisibility::Collapsed;
-					})
+					// Name, community, status.
+					+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(14.f, 0.f, 14.f, 16.f)
 					[
-						SNew(SAIBButton)
-						.Text(LOCTEXT("Remove", "X"))
-						.FontSize(16)
-						.Height(32.f)
-						.Kind(EAIBButtonKind::Ghost)
-						.OnClicked_Lambda([this, Slot]() { if (PC()) PC()->ServerRemoveSeat(Slot); return FReply::Handled(); })
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+						[
+							SNew(STextBlock)
+							.Font(AIBStyle::Spaced(AIBStyle::Heading(24), 40))
+							.Justification(ETextJustify::Center)
+							.Text_Lambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS ? FText::FromString(PS->GetPlayerName().ToUpper()) : LOCTEXT("OpenSeat", "OPEN SEAT"); })
+							.ColorAndOpacity_Lambda([Seat]() { return FSlateColor(Seat() ? AIBStyle::Text() : AIBStyle::TextFaint()); })
+						]
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+						[
+							SNew(STextBlock).Font(AIBStyle::SubHeading(15)).Text(AIB::Community(Slot).Name).ColorAndOpacity(FLinearColor(Color.R, Color.G, Color.B, 0.95f))
+						]
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 0.f, 0.f, 10.f)
+						[
+							SNew(STextBlock).Font(AIBStyle::Body(12)).Text(AIB::Community(Slot).ShipName).ColorAndOpacity(AIBStyle::TextDim())
+						]
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+						[
+							SNew(SBox)
+							.Visibility_Lambda([this, Seat]() { return !Seat() && PC() && PC()->IsHost() && Phase() == EAIBPhase::Lobby && GS() && !GS()->bAITestMode ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+							[
+								AIBUI::Pill(TAttribute<FText>::CreateLambda(StatusText), TAttribute<FSlateColor>::CreateLambda(StatusColor), 15)
+							]
+						]
+						// Host: put an AI champion in an open seat.
+						+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+						[
+							SNew(SBox)
+							.Visibility_Lambda([this, Seat]() { return !Seat() && PC() && PC()->IsHost() && Phase() == EAIBPhase::Lobby && GS() && !GS()->bAITestMode ? EVisibility::Visible : EVisibility::Collapsed; })
+							[
+								SNew(SAIBSlantButton).Icon(AIBIcon::Robot).Text(LOCTEXT("AddAISeat", "ADD AI")).FontSize(16).Height(38.f).Centered(true)
+								.OnClicked_Lambda([this]() { if (PC()) PC()->ServerAddBot(); return FReply::Handled(); })
+							]
+						]
 					]
 				]
 			]
 		];
 	}
 
-	// Left: the room (code + champions).
-	TSharedRef<SWidget> Room = SNew(SBox)
-		.WidthOverride(600.f)
+	// Room code (top left, under the title).
+	TSharedRef<SWidget> RoomCodeBlock = AIBUI::Frame(
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 22.f, 0.f)
 		[
-			AIBUI::Panel(
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight()
-				[
-					SNew(STextBlock).Text(LOCTEXT("Gathering", "THE GATHERING")).Font(AIBStyle::Title(54)).ColorAndOpacity(AIBStyle::Text())
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 14.f)
-				[
-					SNew(STextBlock).Text(LOCTEXT("GatheringSub", "Five fleets answered the beacon. Five seats. One island.")).Font(AIBStyle::Story(15)).ColorAndOpacity(AIBStyle::TextDim()).AutoWrapText(true)
-				]
-				// Room code.
-				+ SVerticalBox::Slot().AutoHeight()
-				[
-					SNew(SBorder)
-					.BorderImage(AIBStyle::CardBrush())
-					.Padding(FMargin(18.f, 12.f))
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(STextBlock)
-								.Font(AIBStyle::SubHeading(15))
-								.ColorAndOpacity(AIBStyle::TextDim())
-								.Text_Lambda([this]() { return bShowInternetCode ? LOCTEXT("InternetCode", "INTERNET ROOM CODE") : LOCTEXT("RoomCode", "ROOM CODE"); })
-							]
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(STextBlock)
-								.Font(AIBStyle::Title(54))
-								.ColorAndOpacity(AIBStyle::Gold())
-								.Text_Lambda([Code]() { const FString C = Code(); return C.IsEmpty() ? LOCTEXT("NoCode", "- - - -") : FText::FromString(C); })
-							]
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(STextBlock)
-								.Font(AIBStyle::Body(13))
-								.ColorAndOpacity(AIBStyle::TextDim())
-								.AutoWrapText(true)
-								.Text_Lambda([this]()
-								{
-									const AAIBGameState* G = GS();
-									if (bShowInternetCode)
-									{
-										return G && G->RoomCodeInternet.IsEmpty() ? LOCTEXT("InternetPending", "Looking up your internet address...")
-											: LOCTEXT("InternetHelp", "For friends elsewhere. Your router must forward UDP port 7777 to this PC.");
-									}
-									return LOCTEXT("LanHelp", "Friends on your network open JOIN ROOM and type this code.");
-								})
-							]
-						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.f, 0.f, 0.f, 0.f)
-						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f)
-							[
-								SNew(SAIBButton)
-								.Kind(EAIBButtonKind::Gold)
-								.MinWidth(150.f)
-								.Height(44.f)
-								.FontSize(18)
-								.Text_Lambda([this]() { return FPlatformTime::Seconds() - CopiedTime < 2.0 ? LOCTEXT("Copied", "COPIED!") : LOCTEXT("Copy", "COPY CODE"); })
-								.OnClicked_Lambda([this, Code]()
-								{
-									const FString C = Code();
-									if (!C.IsEmpty())
-									{
-										FPlatformApplicationMisc::ClipboardCopy(*C);
-										CopiedTime = FPlatformTime::Seconds();
-									}
-									return FReply::Handled();
-								})
-							]
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(SAIBButton)
-								.Kind(EAIBButtonKind::Ghost)
-								.MinWidth(150.f)
-								.Height(30.f)
-								.FontSize(14)
-								.Text_Lambda([this]() { return bShowInternetCode ? LOCTEXT("ShowLan", "SHOW LOCAL CODE") : LOCTEXT("ShowInternet", "INTERNET CODE"); })
-								.OnClicked_Lambda([this]() { bShowInternetCode = !bShowInternetCode; return FReply::Handled(); })
-							]
-						]
-					]
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 16.f, 0.f, 4.f)
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
-					[
-						AIBUI::Header(LOCTEXT("Champions", "CHAMPIONS"))
-					]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
-					[
-						SNew(STextBlock)
-						.Font(AIBStyle::Heading(18))
-						.Text_Lambda([SeatedCount]() { return FText::Format(LOCTEXT("SeatCount", "{0} / {1}"), SeatedCount(), AIB::MaxPlayers); })
-						.ColorAndOpacity_Lambda([SeatedCount]() { return FSlateColor(SeatedCount() >= AIB::MaxPlayers ? AIBStyle::Acid() : AIBStyle::Gold()); })
-					]
-				]
-				+ SVerticalBox::Slot().AutoHeight()[Seats]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f, 0.f, 0.f)
-				[
-					SNew(SHorizontalBox)
-					.Visibility_Lambda([this, IsHost]() { return IsHost() && Phase() == EAIBPhase::Lobby && GS() && !GS()->bAITestMode ? EVisibility::Visible : EVisibility::Collapsed; })
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)
-					[
-						SNew(SAIBButton).Text(LOCTEXT("AddAI", "ADD AI CHAMPION")).FontSize(16).Height(40.f)
-						.OnClicked_Lambda([this]() { if (PC()) PC()->ServerAddBot(); return FReply::Handled(); })
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(4.f, 0.f, 0.f, 0.f)
-					[
-						SNew(SAIBButton).Text(LOCTEXT("FillAI", "FILL EMPTY SEATS")).FontSize(16).Height(40.f)
-						.OnClicked_Lambda([this]() { if (PC()) PC()->ServerFillBots(); return FReply::Handled(); })
-					]
-				],
-				FMargin(28.f), true)
-		];
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Spaced(AIBStyle::SubHeading(15), 260))
+				.ColorAndOpacity(AIBStyle::TextDim())
+				.Text_Lambda([this]() { return bShowInternetCode ? LOCTEXT("InternetCode", "INTERNET ROOM CODE") : LOCTEXT("RoomCode", "ROOM CODE"); })
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, -6.f, 0.f, 0.f)
+			[
+				SNew(STextBlock)
+				.Font_Lambda([Code]() { return Code().IsEmpty() ? AIBStyle::Spaced(AIBStyle::Title(30), 60) : AIBStyle::Spaced(AIBStyle::Title(70), 160); })
+				.ColorAndOpacity(AIBStyle::Gold())
+				.ShadowOffset(FVector2D(2.f, 2.f))
+				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.5f))
+				.Text_Lambda([this, Code]()
+				{
+					const FString C = Code();
+					if (!C.IsEmpty())
+					{
+						return FText::FromString(C);
+					}
+					if (bShowInternetCode)
+					{
+						return LOCTEXT("InternetPending", "LOOKING UP YOUR INTERNET ADDRESS...");
+					}
+					return PC() && PC()->GetWorld() && PC()->GetWorld()->GetNetMode() == NM_Standalone ? LOCTEXT("NoNetwork", "OFFLINE - CREATE THE ROOM AGAIN") : LOCTEXT("CodePending", "GETTING YOUR ROOM CODE...");
+				})
+			]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Body(14))
+				.ColorAndOpacity(AIBStyle::TextDim())
+				.Text_Lambda([this]()
+				{
+					return bShowInternetCode ? LOCTEXT("InternetHelp", "For friends elsewhere. Forward UDP port 7777 on your router to this PC.")
+						: LOCTEXT("LanHelp", "Friends on your network: JOIN ROOM, then type this code.");
+				})
+			]
+		]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f, 0.f)
+		[
+			SNew(SAIBSlantButton)
+			.Kind(EAIBButtonKind::Gold)
+			.Icon(AIBIcon::Copy)
+			.FontSize(19)
+			.Height(52.f)
+			.MinWidth(150.f)
+			.IsEnabled_Lambda([Code]() { return !Code().IsEmpty(); })
+			.Text_Lambda([this]() { return FPlatformTime::Seconds() - CopiedTime < 2.0 ? LOCTEXT("Copied", "COPIED") : LOCTEXT("Copy", "COPY"); })
+			.OnClicked_Lambda([this, Code]()
+			{
+				const FString C = Code();
+				if (!C.IsEmpty())
+				{
+					FPlatformApplicationMisc::ClipboardCopy(*C);
+					CopiedTime = FPlatformTime::Seconds();
+				}
+				return FReply::Handled();
+			})
+		]
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+		[
+			SNew(SAIBIconButton)
+			.Icon_Lambda([this]() { return bShowInternetCode ? AIBIcon::Lan : AIBIcon::Globe; })
+			.Label_Lambda([this]() { return bShowInternetCode ? LOCTEXT("ShowLan", "LOCAL") : LOCTEXT("ShowInternet", "INTERNET"); })
+			.IsActive_Lambda([this]() { return bShowInternetCode; })
+			.Size(48.f)
+			.OnClicked_Lambda([this]() { bShowInternetCode = !bShowInternetCode; return FReply::Handled(); })
+		],
+		FMargin(26.f, 14.f), FLinearColor(1.f, 0.74f, 0.32f, 0.9f), 0.78f);
 
-	// Right: what happens next.
-	auto MicText = [this]()
-	{
-		UAIBGameInstance* GI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr;
-		switch (GI ? GI->GetSettings().MicMode : 1)
-		{
-		case 0: return LOCTEXT("MicOff", "MIC: OFF");
-		case 2: return LOCTEXT("MicOpen", "MIC: OPEN");
-		default: return LOCTEXT("MicPtt", "MIC: HOLD V");
-		}
-	};
+	// Start / ready, AI test mode and status (bottom left).
 	TSharedRef<SWidget> Actions = SNew(SBox)
-		.WidthOverride(460.f)
+		.WidthOverride(500.f)
 		[
-			AIBUI::Panel(
-				SNew(SVerticalBox)
-				// Status.
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 12.f)
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().Padding(4.f, 0.f, 0.f, 12.f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)
+				[
+					AIBUI::Icon(AIBIcon::Hourglass, 26, AIBStyle::Gold())
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
-					.Font(AIBStyle::BodyMedium(17))
+					.Font(AIBStyle::BodyMedium(19))
 					.AutoWrapText(true)
 					.ColorAndOpacity(AIBStyle::Text())
+					.ShadowOffset(FVector2D(1.f, 1.f))
 					.Text_Lambda([this, IsHost, SeatedCount, NotReadyCount]()
 					{
 						const AAIBGameState* G = GS();
@@ -368,72 +367,86 @@ TSharedRef<SWidget> SAIBHud::MakeLobbyPanel()
 						{
 							return FText::Format(LOCTEXT("StatusNotReady", "{0} {0}|plural(one=champion is,other=champions are) not ready yet."), NotReady);
 						}
-						return IsHost() ? LOCTEXT("StatusHostGo", "Everyone is here. Start the trials when you are ready.") : LOCTEXT("StatusWaitHost", "Everyone is here. Waiting for the host to start.");
+						return IsHost() ? LOCTEXT("StatusHostGo", "Everyone is here. Start the trials!") : LOCTEXT("StatusWaitHost", "Everyone is here. Waiting for the host to start.");
 					})
 				]
-				// AI test mode, right above START (the host switches it, everyone sees it).
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
+			]
+			// AI test mode, right above START.
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::WhiteBrush())
+				.BorderBackgroundColor(FLinearColor(0.012f, 0.013f, 0.018f, 0.72f))
+				.Padding(FMargin(16.f, 10.f))
 				[
-					SNew(SBorder)
-					.BorderImage(AIBStyle::CardBrush())
-					.Padding(FMargin(14.f, 8.f))
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f, 0.f)
 					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						AIBUI::Icon(AIBIcon::Robot, 30, TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(GS() && GS()->bAITestMode ? AIBStyle::Ember() : AIBStyle::TextDim()); }))
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()
 						[
-							SNew(SVerticalBox)
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(STextBlock).Text(LOCTEXT("AITest", "AI TEST MODE")).Font(AIBStyle::Heading(18)).ColorAndOpacity(AIBStyle::Text())
-							]
-							+ SVerticalBox::Slot().AutoHeight()
-							[
-								SNew(STextBlock)
-								.Font(AIBStyle::Body(13))
-								.ColorAndOpacity(AIBStyle::TextDim())
-								.Text_Lambda([IsHost]() { return IsHost() ? LOCTEXT("AITestSub", "Empty seats get AI champions") : LOCTEXT("AITestGuest", "The host decides"); })
-							]
+							SNew(STextBlock).Text(LOCTEXT("AITest", "AI TEST MODE")).Font(AIBStyle::Spaced(AIBStyle::Heading(19), 80)).ColorAndOpacity(AIBStyle::Text())
 						]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						+ SVerticalBox::Slot().AutoHeight()
 						[
-							SNew(SAIBButton)
-							.MinWidth(86.f)
-							.Height(38.f)
-							.FontSize(17)
-							.IsEnabled_Lambda([this, IsHost]() { return IsHost() && Phase() == EAIBPhase::Lobby; })
-							.AccentColor_Lambda([this]() { return GS() && GS()->bAITestMode ? FLinearColor(0.16f, 0.45f, 0.1f, 1.f) : FLinearColor(0.06f, 0.06f, 0.07f, 0.85f); })
-							.Text_Lambda([this]() { return GS() && GS()->bAITestMode ? LOCTEXT("On", "ON") : LOCTEXT("Off", "OFF"); })
-							.OnClicked_Lambda([this]() { if (PC() && GS()) PC()->ServerSetAITestMode(!GS()->bAITestMode); return FReply::Handled(); })
+							SNew(STextBlock)
+							.Font(AIBStyle::Body(13))
+							.ColorAndOpacity(AIBStyle::TextDim())
+							.Text_Lambda([IsHost]() { return IsHost() ? LOCTEXT("AITestSub", "Fill every empty seat with an AI champion") : LOCTEXT("AITestGuest", "Switched by the host"); })
 						]
 					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SAIBToggle)
+						.IsEnabled_Lambda([this, IsHost]() { return IsHost() && Phase() == EAIBPhase::Lobby; })
+						.IsOn_Lambda([this]() { return GS() && GS()->bAITestMode; })
+						.OnToggled_Lambda([this](bool bOn) { if (PC()) PC()->ServerSetAITestMode(bOn); })
+					]
 				]
-				// Start (host) / ready (everyone else).
-				+ SVerticalBox::Slot().AutoHeight()
+			]
+			// Start (host) / ready (everyone else).
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SBox)
+				.Visibility_Lambda([IsHost]() { return IsHost() ? EVisibility::Visible : EVisibility::Collapsed; })
 				[
-					SNew(SAIBButton)
+					SNew(SAIBSlantButton)
 					.Kind(EAIBButtonKind::Primary)
-					.FontSize(26)
-					.Height(64.f)
-					.Visibility_Lambda([IsHost]() { return IsHost() ? EVisibility::Visible : EVisibility::Collapsed; })
+					.Icon(AIBIcon::Play)
+					.FontSize(40)
+					.Height(104.f)
+					.MinWidth(500.f)
+					.Shine(true)
 					.IsEnabled_Lambda([this, SeatedCount, NotReadyCount]() { return Phase() == EAIBPhase::Lobby && SeatedCount() >= AIB::MaxPlayers && NotReadyCount() == 0; })
-					.Text_Lambda([this]() { return Phase() == EAIBPhase::LobbyCountdown ? LOCTEXT("Starting", "STARTING...") : LOCTEXT("Start", "START THE TRIALS"); })
+					.Text_Lambda([this]() { return Phase() == EAIBPhase::LobbyCountdown ? LOCTEXT("Starting", "STARTING") : LOCTEXT("Start", "START"); })
 					.SubText_Lambda([this, SeatedCount, NotReadyCount]()
 					{
-						if (Phase() != EAIBPhase::Lobby) return FText::GetEmpty();
-						if (SeatedCount() < AIB::MaxPlayers) return FText::Format(LOCTEXT("StartNeeds", "Needs all {1} champions ({0} / {1})"), SeatedCount(), AIB::MaxPlayers);
+						if (Phase() != EAIBPhase::Lobby) return LOCTEXT("StartSoon", "The trials begin");
+						if (SeatedCount() < AIB::MaxPlayers) return FText::Format(LOCTEXT("StartNeeds", "{0} of {1} champions here"), SeatedCount(), AIB::MaxPlayers);
 						if (NotReadyCount() > 0) return LOCTEXT("StartNotReady", "Waiting for everyone to be ready");
-						return FText::GetEmpty();
+						return LOCTEXT("StartGo", "Begin the trials");
 					})
 					.OnClicked_Lambda([this]() { if (PC()) PC()->ServerStartMatch(); return FReply::Handled(); })
 				]
-				+ SVerticalBox::Slot().AutoHeight()
+			]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SBox)
+				.Visibility_Lambda([IsHost]() { return IsHost() ? EVisibility::Collapsed : EVisibility::Visible; })
 				[
-					SNew(SAIBButton)
+					SNew(SAIBSlantButton)
 					.Kind(EAIBButtonKind::Primary)
-					.FontSize(26)
-					.Height(64.f)
-					.Visibility_Lambda([IsHost]() { return IsHost() ? EVisibility::Collapsed : EVisibility::Visible; })
+					.Icon(AIBIcon::Check)
+					.FontSize(40)
+					.Height(104.f)
+					.MinWidth(500.f)
+					.Shine(true)
 					.Text_Lambda([this]() { const AAIBPlayerState* Me = MyPS(); return Me && Me->bReady ? LOCTEXT("Unready", "NOT READY") : LOCTEXT("Ready", "READY"); })
+					.SubText_Lambda([this]() { const AAIBPlayerState* Me = MyPS(); return Me && Me->bReady ? LOCTEXT("UnreadySub", "Click if you need more time") : LOCTEXT("ReadySub", "Tell the host you are ready"); })
 					.IsEnabled_Lambda([this]() { const AAIBPlayerState* Me = MyPS(); return Me && Me->Slot != INDEX_NONE && Phase() == EAIBPhase::Lobby; })
 					.OnClicked_Lambda([this]()
 					{
@@ -442,73 +455,142 @@ TSharedRef<SWidget> SAIBHud::MakeLobbyPanel()
 						return FReply::Handled();
 					})
 				]
-				// Settings, microphone, rules.
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f, 0.f, 0.f)
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)
-					[
-						SNew(SAIBButton).Text(LOCTEXT("LobbySettings", "SETTINGS")).FontSize(16).Height(42.f)
-						.OnClicked_Lambda([this]() { OpenSettings(); return FReply::Handled(); })
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(4.f, 0.f)
-					[
-						SNew(SAIBButton).Text_Lambda(MicText).FontSize(16).Height(42.f)
-						.OnClicked_Lambda([this]()
-						{
-							// Cycle push-to-talk -> open mic -> off.
-							if (UAIBGameInstance* GI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr)
-							{
-								FAIBSettings S = GI->GetSettings();
-								S.MicMode = S.MicMode == 1 ? 2 : (S.MicMode == 2 ? 0 : 1);
-								GI->SetSettings(S);
-							}
-							return FReply::Handled();
-						})
-					]
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(4.f, 0.f, 0.f, 0.f)
-					[
-						SNew(SAIBButton).Text(LOCTEXT("LobbyRules", "RULES")).FontSize(16).Height(42.f)
-						.OnClicked_Lambda([this]() { OpenRules(); return FReply::Handled(); })
-					]
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f, 0.f, 0.f)
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
-					[
-						SNew(STextBlock)
-						.Font(AIBStyle::Body(13))
-						.ColorAndOpacity(AIBStyle::TextFaint())
-						.Text(LOCTEXT("LobbyKeys", "ENTER  chat      V  talk"))
-					]
-					+ SHorizontalBox::Slot().AutoWidth()
-					[
-						SNew(SAIBButton).Text(LOCTEXT("LeaveLobby", "LEAVE ROOM")).Kind(EAIBButtonKind::Ghost).FontSize(16).Height(36.f)
-						.OnClicked_Lambda([this]() { if (PC()) PC()->LeaveMatch(); return FReply::Handled(); })
-					]
-				],
-				FMargin(24.f), true)
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(30.f, 10.f, 0.f, 0.f)
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Spaced(AIBStyle::SubHeading(14), 160))
+				.ColorAndOpacity(AIBStyle::TextFaint())
+				.Text(LOCTEXT("LobbyKeys", "ENTER  chat      V  talk      ESC  menu"))
+			]
 		];
 
 	return SNew(SOverlay)
 		.Visibility_Lambda([IsLobby]() { return IsLobby() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(48.f, 40.f, 0.f, 40.f)[Room]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 48.f, 48.f)[Actions]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 40.f, 0.f, 0.f)
+		// Shade the edges so the panels read over the fleet.
+		+ SOverlay::Slot()
+		[
+			SNew(SAIBGradient).Vertical(false).Colors({ FLinearColor(0.f, 0.f, 0.f, 0.75f), FLinearColor(0.f, 0.f, 0.f, 0.25f), FLinearColor(0.f, 0.f, 0.f, 0.f), FLinearColor(0.f, 0.f, 0.f, 0.f) })
+		]
+		+ SOverlay::Slot().VAlign(VAlign_Bottom)
+		[
+			SNew(SBox).HeightOverride(460.f)[SNew(SAIBGradient).Colors({ FLinearColor(0.f, 0.f, 0.f, 0.f), FLinearColor(0.f, 0.f, 0.f, 0.82f) })]
+		]
+		+ SOverlay::Slot().VAlign(VAlign_Top)
+		[
+			SNew(SBox).HeightOverride(200.f)[SNew(SAIBGradient).Colors({ FLinearColor(0.f, 0.f, 0.f, 0.6f), FLinearColor(0.f, 0.f, 0.f, 0.f) })]
+		]
+		// Title and room code.
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(84.f, 48.f, 0.f, 0.f)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 16.f)
+			[
+				SNew(SAIBReveal).Offset(FVector2D(0.f, -30.f))
+				[
+					AIBUI::PageTitle(LOCTEXT("RoomKicker", "FIVE FLEETS. FIVE SEATS. ONE ISLAND."), LOCTEXT("Gathering", "THE GATHERING"), 76)
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left)
+			[
+				SNew(SAIBReveal).Delay(0.1f)[RoomCodeBlock]
+			]
+		]
+		// Rules, microphone, settings, leave (top right).
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 54.f, 72.f, 0.f)
+		[
+			SNew(SAIBReveal).Offset(FVector2D(0.f, -30.f)).Delay(0.1f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().Padding(6.f, 0.f)
+				[
+					SNew(SAIBIconButton).Icon(AIBIcon::Book).Label(LOCTEXT("NavRules", "RULES"))
+					.OnClicked_Lambda([this]() { OpenRules(); return FReply::Handled(); })
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(6.f, 0.f)
+				[
+					SNew(SAIBIconButton)
+					.Icon_Lambda([MicMode]() { return MicMode() == 0 ? AIBIcon::MicOff : AIBIcon::Mic; })
+					.Label_Lambda([MicMode]()
+					{
+						switch (MicMode())
+						{
+						case 0: return LOCTEXT("MicOff", "MIC OFF");
+						case 2: return LOCTEXT("MicOpen", "MIC OPEN");
+						default: return LOCTEXT("MicPtt", "HOLD V");
+						}
+					})
+					.IsActive_Lambda([this]() { return PC() && PC()->IsSpeaking(); })
+					.OnClicked_Lambda([this]()
+					{
+						// Cycle push-to-talk -> open mic -> off.
+						if (UAIBGameInstance* GI = PC() ? PC()->GetGameInstance<UAIBGameInstance>() : nullptr)
+						{
+							FAIBSettings S = GI->GetSettings();
+							S.MicMode = S.MicMode == 1 ? 2 : (S.MicMode == 2 ? 0 : 1);
+							GI->SetSettings(S);
+						}
+						return FReply::Handled();
+					})
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(6.f, 0.f)
+				[
+					SNew(SAIBIconButton).Icon(AIBIcon::Settings).Label(LOCTEXT("NavSettings", "SETTINGS"))
+					.OnClicked_Lambda([this]() { OpenSettings(); return FReply::Handled(); })
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(6.f, 0.f, 0.f, 0.f)
+				[
+					SNew(SAIBIconButton).Icon(AIBIcon::Logout).Label(LOCTEXT("LeaveLobby", "LEAVE"))
+					.OnClicked_Lambda([this]() { if (PC()) PC()->LeaveMatch(); return FReply::Handled(); })
+				]
+			]
+		]
+		// Champions (bottom right).
+		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 66.f, 60.f)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().Padding(6.f, 0.f, 0.f, 10.f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f, 0.f)
+				[
+					SNew(SBox).WidthOverride(26.f).HeightOverride(3.f)[SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(AIBStyle::Ember())]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(STextBlock).Text(LOCTEXT("Champions", "CHAMPIONS")).Font(AIBStyle::Spaced(AIBStyle::SubHeading(17), 260)).ColorAndOpacity(AIBStyle::Gold())
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f, 0.f, 0.f, 0.f)
+				[
+					SNew(STextBlock)
+					.Font(AIBStyle::Title(30))
+					.Text_Lambda([SeatedCount]() { return FText::Format(LOCTEXT("SeatCount", "{0} / {1}"), SeatedCount(), AIB::MaxPlayers); })
+					.ColorAndOpacity_Lambda([SeatedCount]() { return FSlateColor(SeatedCount() >= AIB::MaxPlayers ? AIBStyle::Acid() : AIBStyle::Text()); })
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight()[Cards]
+		]
+		// Start / ready (bottom left).
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(84.f, 0.f, 0.f, 60.f)
+		[
+			SNew(SAIBReveal).Offset(FVector2D(-60.f, 0.f)).Delay(0.3f)[Actions]
+		]
+		// Countdown.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 150.f, 0.f, 0.f)
 		[
 			SNew(SVerticalBox)
 			.Visibility_Lambda([this]() { return Phase() == EAIBPhase::LobbyCountdown ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				SNew(STextBlock).Text(LOCTEXT("BeginIn", "THE TRIALS BEGIN IN")).Font(AIBStyle::Heading(24)).ColorAndOpacity(AIBStyle::Gold()).ShadowOffset(FVector2D(1.f, 1.f))
+				SNew(STextBlock).Text(LOCTEXT("BeginIn", "THE TRIALS BEGIN IN")).Font(AIBStyle::Spaced(AIBStyle::Heading(26), 200)).ColorAndOpacity(AIBStyle::Gold()).ShadowOffset(FVector2D(1.f, 1.f))
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
 				SNew(STextBlock)
-				.Font(AIBStyle::Title(110))
-				.ColorAndOpacity(AIBStyle::Text())
-				.ShadowOffset(FVector2D(2.f, 2.f))
+				.Font(AIBStyle::Title(150))
+				.ColorAndOpacity(FLinearColor::White)
+				.ShadowOffset(FVector2D(3.f, 3.f))
+				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.6f))
 				.Text_Lambda([this]() { const AAIBGameState* G = GS(); return FText::AsNumber(G ? FMath::CeilToInt(G->GetPhaseRemaining()) : 0); })
 			]
 		];

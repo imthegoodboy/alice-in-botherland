@@ -1,6 +1,7 @@
 // Alice in Botherland - online lobbies: host, browse, join, invite (Steam or LAN)
 
 #include "Online/AIBSessionSubsystem.h"
+#include "Online/AIBRoomCode.h"
 #include "Core/AIBGameInstance.h"
 #include "AliceInBotherland.h"
 #include "OnlineSubsystem.h"
@@ -68,9 +69,47 @@ bool UAIBSessionSubsystem::HasOnlinePlatform() const
 
 FString UAIBSessionSubsystem::GetLocalAddress() const
 {
+	ISocketSubsystem* SocketSub = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+	if (!SocketSub)
+	{
+		return TEXT("?");
+	}
+	auto UsableIPv4 = [](const FString& Address)
+	{
+		return Address.Contains(TEXT(".")) && !Address.Contains(TEXT(":")) && !Address.StartsWith(TEXT("127.")) && !Address.StartsWith(TEXT("0."))
+			&& !Address.StartsWith(TEXT("169.254."));
+	};
 	bool bCanBind = false;
-	TSharedRef<FInternetAddr> Addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, bCanBind);
-	return Addr->IsValid() ? Addr->ToString(false) : TEXT("?");
+	TSharedRef<FInternetAddr> Addr = SocketSub->GetLocalHostAddr(*GLog, bCanBind);
+	const FString Host = Addr->IsValid() ? Addr->ToString(false) : FString();
+	if (UsableIPv4(Host))
+	{
+		return Host;
+	}
+	// The default lookup can return IPv6, loopback or nothing (e.g. while a network adapter is waking up): take the
+	// first local IPv4 address of a network adapter instead, preferring home / office ranges.
+	TArray<TSharedPtr<FInternetAddr>> Adapters;
+	FString Fallback;
+	if (SocketSub->GetLocalAdapterAddresses(Adapters))
+	{
+		for (const TSharedPtr<FInternetAddr>& Adapter : Adapters)
+		{
+			const FString Address = Adapter.IsValid() ? Adapter->ToString(false) : FString();
+			if (!UsableIPv4(Address))
+			{
+				continue;
+			}
+			if (AIBRoomCode::IsPrivateAddress(Address))
+			{
+				return Address;
+			}
+			if (Fallback.IsEmpty())
+			{
+				Fallback = Address;
+			}
+		}
+	}
+	return Fallback.IsEmpty() ? TEXT("?") : Fallback;
 }
 
 FString UAIBSessionSubsystem::TravelOptions() const

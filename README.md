@@ -12,6 +12,8 @@ and at the end of it all a single choice remains: **become the King, or save you
 |---|---|
 | ![Main menu](docs/screenshots/main-menu.png) | ![The room](docs/screenshots/lobby.png) |
 | *The main menu* | *The room: share the code, wait for five champions* |
+| ![Your champion](docs/screenshots/profile.png) | ![Settings](docs/screenshots/settings.png) |
+| *Your champion: name and date of birth on scroll wheels* | *Settings: audio, voice and captions, controls, graphics* |
 | ![Exploring the island](docs/screenshots/island.png) | ![Alice explains the rules](docs/screenshots/rules-card.png) |
 | *Exploring the island while Alice welcomes you* | *Alice explains each trial's rules* |
 | ![Arrival](docs/screenshots/arrival.png) | ![Stage 1: the Number Game](docs/screenshots/stage1-number-game.png) |
@@ -44,10 +46,13 @@ The full design document is [`game.md`](game.md).
 
 ### Playing
 
-- **First launch**: enter your champion name and date of birth (kept on your PC only).
+- **First launch**: enter your champion name and pick your date of birth on the scroll wheels (kept on your PC only).
+- **Main menu**: pick a mode (Play vs AI, Create room, Join room) and press **START**; Rules, Hall, Settings, Credits and Quit are the icons at the top right.
 - **Play vs AI**: you and four AI champions.
 - **Create room / join room**: the room shows a short code such as `6C2M-9QZ`. Friends on the same network type it in **Join room**. For internet play, the host switches to the **internet code** and forwards UDP port 7777 on their router. Rooms on your network are also listed, and you can still connect by IP address.
-- **Voice chat**: hold **V** to talk (or set the microphone to *always on* / *off* in Settings). A green dot shows who is talking.
+- **Voice chat**: hold **V** to talk (or set the microphone to *always on* / *off* in Settings). A microphone icon shows who is talking.
+- **In a match**: press **Esc** or the gear at the top right for the game menu (resume, settings, how to play, leave) with quick sliders for mouse sensitivity, field of view and volume.
+- **Settings**: audio, voice and captions, controls (sensitivity, invert, field of view, key list) and graphics (quality, resolution, brightness, frame-rate limit, motion blur, FPS counter, fullscreen, VSync).
 - Reconnects: a disconnected player's seat is held by an AI "ghost" for 30 s in the lobby and 20 s during a match.
 
 | Action | Keyboard / mouse | Gamepad |
@@ -134,7 +139,7 @@ Everything game-specific lives in the C++ module `Source/AliceInBotherland` (cla
 | `World/` | Self-building set pieces spawned locally on every machine by `UAIBWorldSubsystem`: ocean, fleet, landing site, Number room, hotel, race course, Guardian site and environment lighting. Positions are in `AIBLayout.h`; the race route is in `AIBRacePath.h`. |
 | `Audio/` | Music crossfades, voice-over with captions, ambience per zone, and the narrator (`AIBNarration`: Alice's lines and the timed story / rules sequences). |
 | `Online/` | Sessions: Steam (App ID 480 for development) with a LAN / direct-IP fallback, and room codes (`AIBRoomCode`: the host's address packed into a short code). |
-| `UI/` | All UI is Slate in C++: main menu and profile, the room, story and rules cards, HUD, every stage panel, settings, the leaderboard. |
+| `UI/` | All UI is Slate in C++: main menu and profile, the room, story and rules cards, HUD, every stage panel, settings, the leaderboard. `SAIBGameUI` holds the game-style widgets (slanted buttons, icon buttons, sliders, switches, scroll wheels, reveal animations); icons come from the Material Icons font. |
 
 One map (`L_Island`) hosts the main menu, the lobby and the whole match. There is no level travel between phases.
 
@@ -169,7 +174,7 @@ Imported pictures live in `Content/AliceInBotherland/UI/Story/`, the voice lines
 
 ### Known issues and notes
 
-- **Smart App Control**: Shipping builds are not code-signed. On PCs with Windows Smart App Control enabled, an individual build can be refused (`Microsoft-Windows-CodeIntegrity/Operational` shows event 3033). Rebuilding usually produces an accepted binary, and running through `UnrealEditor.exe -game` always works.
+- **Smart App Control**: builds are not code-signed, and Windows judges every new binary (the editor's game DLL too). A refused DLL shows "The game module could not be loaded" (error 4551); rebuilding with any small change usually gets an accepted binary. Shipping builds are not code-signed either. On PCs with Windows Smart App Control enabled, an individual build can be refused (`Microsoft-Windows-CodeIntegrity/Operational` shows event 3033). Rebuilding usually produces an accepted binary, and running through `UnrealEditor.exe -game` always works.
 - **Graphics**: auto-detection caps quality at High, because Epic overflows 4 GB GPUs (stutter and flicker). Epic can still be chosen in Settings.
 - **Steam**: with Steam not running, the game falls back to LAN / direct IP.
 

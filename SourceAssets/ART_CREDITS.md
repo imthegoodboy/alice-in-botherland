@@ -37,6 +37,8 @@ The OFL lets you bundle, embed and ship these fonts in the game. You may not sel
 
 `UI/Images/Crest_0..4.png` are rendered from Google **Material Icons** glyphs (tsunami, local_fire_department, notifications, anchor, eco). They are licensed under the **Apache License 2.0** (github.com/google/material-design-icons).
 
+The interface icons are drawn at runtime from the Material Icons font itself, `Content/AliceInBotherland/UI/Fonts/MaterialIcons-Regular.ttf` (same licence).
+
 ## Original project assets
 
 The following were made for this project with Blender 5.2 (headless Python), Pillow, numpy and shapely. They contain no third-party content:

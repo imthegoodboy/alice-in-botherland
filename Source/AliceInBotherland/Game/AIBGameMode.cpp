@@ -100,17 +100,27 @@ void AAIBGameMode::UpdateRoomCodes()
 		return;
 	}
 	const int32 Port = GetWorld()->URL.Port > 0 ? GetWorld()->URL.Port : AIBRoomCode::DefaultPort;
-	GS->RoomCode = AIBRoomCode::FromAddress(Sessions->GetLocalAddress(), Port);
-	UE_LOG(LogAIB, Log, TEXT("Room code %s (%s)"), *GS->RoomCode, *Sessions->GetLocalAddress());
-	TWeakObjectPtr<AAIBGameState> WeakGS = GS;
-	AIBRoomCode::FetchPublicAddress([WeakGS, Port](const FString& Public)
+	const FString Local = Sessions->GetLocalAddress();
+	GS->RoomCode = AIBRoomCode::FromAddress(Local, Port);
+	UE_LOG(LogAIB, Log, TEXT("Room code %s (%s)"), *GS->RoomCode, *Local);
+	if (GS->RoomCodeInternet.IsEmpty() && !bFetchingPublicAddress)
 	{
-		if (WeakGS.IsValid() && !Public.IsEmpty())
+		bFetchingPublicAddress = true;
+		TWeakObjectPtr<AAIBGameState> WeakGS = GS;
+		TWeakObjectPtr<AAIBGameMode> WeakThis = this;
+		AIBRoomCode::FetchPublicAddress([WeakGS, WeakThis, Port](const FString& Public)
 		{
-			WeakGS->RoomCodeInternet = AIBRoomCode::FromAddress(Public, Port);
-			UE_LOG(LogAIB, Log, TEXT("Internet room code %s"), *WeakGS->RoomCodeInternet);
-		}
-	});
+			if (WeakThis.IsValid())
+			{
+				WeakThis->bFetchingPublicAddress = false;
+			}
+			if (WeakGS.IsValid() && !Public.IsEmpty())
+			{
+				WeakGS->RoomCodeInternet = AIBRoomCode::FromAddress(Public, Port);
+				UE_LOG(LogAIB, Log, TEXT("Internet room code %s"), *WeakGS->RoomCodeInternet);
+			}
+		});
+	}
 }
 
 void AAIBGameMode::HandleMatchHasStarted()
@@ -585,6 +595,12 @@ bool AAIBGameMode::LobbyIsReady() const
 void AAIBGameMode::TickLobby()
 {
 	AAIBGameState* GS = GetAIBGameState();
+	// No room code yet (the network wasn't ready when the room opened): keep trying while the room is open.
+	if ((GS->RoomCode.IsEmpty() || GS->RoomCodeInternet.IsEmpty()) && GetNetMode() != NM_Standalone && Now() >= NextRoomCodeTry)
+	{
+		NextRoomCodeTry = Now() + 3.f;
+		UpdateRoomCodes();
+	}
 	if (bAutoReady && GS->Phase == EAIBPhase::Lobby)
 	{
 		for (AAIBPlayerState* PS : GS->GetSeatedPlayers())
