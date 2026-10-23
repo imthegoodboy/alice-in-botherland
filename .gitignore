@@ -13,12 +13,18 @@ Build/
 *.sdf
 
 # Fab / Marketplace packs (paid licenses, must not be published publicly).
-# Add each new Fab pack folder here after "Add to Project".
-Content/RogueCharacter/
+# All packs live in Content/ThirdParty/Fab/<PackName>/ (only the .gitkeep is tracked).
+Content/ThirdParty/Fab/*
+!Content/ThirdParty/Fab/.gitkeep
+# Default folders Fab installs into, before they are moved to ThirdParty/Fab
 Content/Fab/
 Content/SurvivalCharacter*/
 Content/Survival_Character*/
 Content/Arberry*/
+Content/*PostApocalyptic*/
+Content/*Post_Apocalyptic*/
+Content/*Desert*/
+Content/JustB*/
 
 # Personal editor folders
 Content/Developers/

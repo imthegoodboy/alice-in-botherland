@@ -17,10 +17,10 @@ Open `AliceInBotherland.uproject` with Unreal Engine 5.8.
 
 ### Fab assets (not included)
 Paid Fab packs are licensed per user and are **not** in this repo. Add them from your own Fab library (Epic Games Launcher → Fab Library → *Add to Project* → AliceInBotherland):
-- Survival Character – Arberry (player character)
-- Island environment pack
+- Survival Character by Arberry (player character)
+- Modular Post Apocalyptic Desert by JustB Studios (environment)
 
-After adding a new pack, list its `Content/<PackFolder>/` in `.gitignore`.
+After adding a pack, move its folder into `Content/ThirdParty/Fab/` in the editor (then right-click → Fix Up Redirectors). That folder is git-ignored.
 
 ## Agentic setup
 | Tool | How it connects |
@@ -40,6 +40,7 @@ claude mcp add unity -s user -- unity mcp
 ```
 Content/AliceInBotherland/   Game assets: Characters, Environment, Blueprints, Maps, Materials, UI, VFX, Audio, Data, Cinematics
 Content/ThirdPerson/         Third Person template content
+Content/ThirdParty/Fab/      Bought Fab packs (not in git)
 SourceAssets/                Raw source files (FBX, .blend, textures, reference)
 Config/                      Project settings
 ```

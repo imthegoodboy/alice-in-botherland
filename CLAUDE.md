@@ -10,7 +10,8 @@ High-quality third-person game built in Unreal Engine 5.8 (Blueprint project, st
 ## Layout
 - `Content/AliceInBotherland/` — all game-owned assets (Characters, Environment, Blueprints, Maps, Materials, UI, VFX, Audio, Data, Cinematics).
 - `SourceAssets/` — raw files outside the engine (FBX, .blend, textures, reference images). Not imported automatically.
-- Fab packs install into their own top-level folder under `Content/` (e.g. `Content/RogueCharacter`). Reference them from there; build game Blueprints in `Content/AliceInBotherland/`.
+- `Content/ThirdParty/Fab/<PackName>/` — bought Fab packs (git-ignored, licensed per user). Fab installs a pack into its own top-level `Content/` folder; move it here in the editor (Content Browser move, then Fix Up Redirectors). Never edit pack assets in place: duplicate into `Content/AliceInBotherland/` first.
 
 ## Characters
-- Player character: **Survival Character – Arberry** (Fab). Not the Rogue Character (`Content/RogueCharacter`, kept but unused for now).
+- Player character: **Survival Character** by Arberry (Fab).
+- Environment: **Modular Post Apocalyptic Desert** by JustB Studios (Fab).
