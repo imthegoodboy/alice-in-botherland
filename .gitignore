@@ -1,0 +1,33 @@
+# Unreal generated
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.idea/
+*.sln
+*.suo
+*.VC.db
+*.opensdf
+*.sdf
+
+# Fab / Marketplace packs (paid licenses, must not be published publicly).
+# Add each new Fab pack folder here after "Add to Project".
+Content/RogueCharacter/
+Content/Fab/
+Content/SurvivalCharacter*/
+Content/Survival_Character*/
+Content/Arberry*/
+
+# Personal editor folders
+Content/Developers/
+Content/Collections/
+
+# Blender backups
+*.blend1
+*.blend2
+
+# OS
+Thumbs.db
+.DS_Store
