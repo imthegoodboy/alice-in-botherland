@@ -23,6 +23,78 @@ and at the end of it all a single choice remains: **become the King, or save you
 | ![The final choice](docs/screenshots/final-choice.png) | ![Results](docs/screenshots/results.png) |
 | *The Guardian's choice* | *The ending and the leaderboard* |
 
+**Download:** [latest release](https://github.com/imthegoodboy/alice-in-botherland/releases/latest). Unzip it and run
+`AliceInBotherland.exe` in the `AliceInBotherland` folder.
+
+## What's new in v1.3.0
+
+A story-driven update: 108 files changed, about 3,300 lines added.
+
+### New story features
+- **The Guardian's judgement (the fall scene).** Every champion eliminated in Trial I or II gets a cinematic scene:
+  - letterbox bars and a close-up of the champion;
+  - they stand in grief and speak their **last words, voiced**. The first fall is always *"Today is not my day... but I hope my people survive."* Seven other lines cover later falls;
+  - they look up as a red line of light finds them, the **red beam strikes from the sky**, the screen flashes red and **they collapse**;
+  - a banner reads "KESTREL HAS FALLEN" and the Guardian gives its verdict;
+  - if two fall together, each speaks in turn and then both are struck.
+- **The truth of the island (epilogue)**, after the ending. Alice reveals that **Doctor Elias Varne** foresaw the dying Earth, secretly built the island as **humanity's backup**, and left the Guardian to find someone worthy. The trials tested the **mind** (Number Game), **trust and loyalty** (Hidden Symbol), and **resolve and the heart** (race and final choice).
+  - Nine narrated picture cards (**six new paintings**), ending on **"THE ISLAND HAS CHOSEN: (name)"** or "the island remains unclaimed". Space skips it.
+- **Story body language**: grief, looking up at the judgement, the chooser thinking, the crowned King's raised fists, and a hand on the heart for the sacrifice.
+- **The Liar's Ledger**: after each symbol round, every claim is revealed as TRUE, LIE, or LIE - BELIEVED.
+- **The match story**: the results screen shows a timeline of every round win, tie, fall, race win and final choice.
+- **New voice recordings:**
+  - 8 last-words lines in a new survivor voice;
+  - 11 epilogue lines by Alice;
+  - 4 of Alice's rule lines re-recorded for the new rules.
+
+### The island
+Gulls circling the cove, the town and the Guardian's beam, tumbleweeds rolling across the road, a dead power line,
+wrecked cars, an abandoned outpost, signposts, a beached shipwreck, sparks over the signal fire, and scrub and rocks
+along the road.
+
+### Voice chat
+- A **mic button with an on/off icon** at the top right (or the **M** key). It shows **LIVE** while you are heard.
+- **Voice chat volume** slider in the Esc menu.
+- A **Mute** button for each player, which hides their voice and their chat.
+- Eliminated players can't be heard by champions still in the trials, because they can see every symbol.
+
+### Gameplay changes
+- **The race**: the first car into the Guardian's ring wins the first choice. There is no stopping and no holding E. If both cars arrive on the same frame, the one deeper in the ring wins.
+- **The final choice**:
+  - a pick you didn't confirm still counts when time runs out;
+  - no stalling by picking and going back;
+  - if the chooser leaves, the choice passes to the other finalist;
+  - the correct ending and message show when the second finalist chooses.
+- **Number Game sudden death**: everyone picks again, so the target keeps moving, but only the tied champions can fall.
+- **A number left on your dial counts** even if you didn't press Lock In.
+- **The host can End Match** from the Esc menu (click twice) to send everyone back to the room.
+
+### Bugs fixed
+1. After a match that went to a sudden-death race, the **next match's race froze**.
+2. With no finalists left, the race **got stuck**.
+3. A finalist who left before the race could have their AI ghost **drive and win**. Now the other finalist wins by walkover.
+4. A **disconnected chooser could be crowned King** by default.
+5. If someone left mid-round in Trial I, **two champions** could be eliminated.
+6. **Anyone could take a disconnected player's seat** by typing the same name. Now only the same player can.
+7. Players who left from the menu kept a ghost holding their seat for 30 s. Now the seat frees at once, and leaving mid-trial counts as a forfeit.
+8. Players who left after being eliminated **vanished from the leaderboard**.
+9. Old ghosts **stayed as AI players** in the next room.
+10. Players who reconnected during the Hidden Symbol **couldn't see anyone's symbols**.
+11. The round's "everyone answered" skip **waited forever** for players who had left.
+12. The Trial II tie announcement was **instantly hidden**.
+13. Chat name matching was too loose ("Ann" matched "Joanna"), so AI champions misread who was told what.
+14. Marker stones **could be read from anywhere**. Now you must stand near them.
+15. The car reset key **could be spammed**. It now has a 3-second cooldown.
+16. Alice **repeated the whole race briefing** before the sudden-death race.
+17. Signpost text **faced the wrong way**.
+18. On-screen text still said "hold the switch for 3 seconds". Updated everywhere.
+
+### Release
+- Version 1.3.0, merged into `main` (pull request #1), tagged `v1.3.0`.
+- GitHub release with the Windows zip (1.5 GB). The packaged `.exe` was tested and plays through the story, Trial I and the fall scene into Trial II.
+- New tool: `Tools/gen_last_words.py` records the champions' last words.
+- README, `HOW TO PLAY.txt` and the developer notes were updated.
+
 ## The game
 
 Five champions (human players, with AI filling any empty seats) play one match:
