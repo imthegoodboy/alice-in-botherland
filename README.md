@@ -32,12 +32,14 @@ Five champions (human players, with AI filling any empty seats) play one match:
 | **Room** | The host creates a room and shares its **room code**; friends join by typing it. When all five seats are filled (AI test mode fills empty seats with AI) and everyone is ready, the host presses **Start**. |
 | **The story** | A narrated picture story (skippable): the fall of Earth, the search for survival, the last island, the Guardian's trials. |
 | **Arrival** | A short cinematic (skippable): the fleets sail through the channel into the cove and the champions land. |
-| **The island** | 30 seconds to explore. Five old marker stones (follow the green light pillars) each tell part of the island's past. |
-| **Stage 1: the Number Game** | Everyone secretly picks 0-100. Target = average × 0.8. The champion **farthest** from the target is eliminated. Ties go to sudden death. |
-| **Stage 2: the Hidden Symbol** | Everyone sees every symbol except their own. Talk in chat, trust, lie, then name your own symbol. 3 rounds; the top two advance. |
-| **Stage 3: the race** | The two finalists drive offroad buggies to the Guardian's beam and hold the switch for 3 s. Winning only earns the **first choice**. |
-| **The Guardian's choice** | **Become the King** (you win; your people are lost) or **Save your people** (you die; they live, and the choice passes to the other finalist). No choice in time means King. |
-| **Ending** | Three main endings (*The Crowned Exile*, *The Gift and the Crown*, *The Double Sacrifice*) plus two for when a finalist forfeits. A leaderboard records champions, sacrifices and eliminations. |
+| **The island** | 30 seconds to explore: gulls over the cove, tumbleweeds on the road, wrecks, a dead power line and an abandoned outpost. Five old marker stones (follow the green light pillars) each tell part of the island's past. |
+| **Stage 1: the Number Game** | Everyone secretly picks 0-100. Target = average × 0.8. The champion **farthest** from the target is eliminated. A tie for farthest means sudden death: everyone picks again (so the target still moves), but only the tied champions can fall. A number dialled in but not locked counts. |
+| **Stage 2: the Hidden Symbol** | Everyone sees every symbol except their own. Talk in chat, trust, lie, then name your own symbol. 3 rounds; the top two advance. After each round **the Liar's Ledger** reveals every claim: true, lie, or lie that was believed. |
+| **Stage 3: the race** | The two finalists drive offroad buggies to the Guardian's beam. **Whoever drives into the glowing ring first** takes the first choice - no stopping, no button. Winning only earns the **first choice**. |
+| **The Guardian's choice** | **Become the King** (you win; your people are lost) or **Save your people** (you die; they live, and the choice passes to the other finalist). No choice in time means King (a pick you didn't confirm still counts). If a chooser leaves, the choice passes on. |
+| **Ending** | Three main endings (*The Crowned Exile*, *The Gift and the Crown*, *The Double Sacrifice*) plus two for when a finalist forfeits. |
+| **The truth of the island** | After the ending Alice reveals why the island exists: long ago Doctor Elias Varne foresaw the dying Earth and built it in secret as humanity's backup, then left the Guardian to find someone worthy. The trials tested the mind (the Number Game), trust and loyalty (the Hidden Symbol), and resolve and the heart (the race and the final choice). Narrated pictures, ending on the champion the island chose (or that it stays unclaimed). Skippable. |
+| **Results** | The leaderboard and **the match story**: a timeline of every round win, tie, fall and choice. |
 
 Alice, the narrator, welcomes the champions and explains every trial's rules in plain words, with captions and a
 picture card, while everyone can still walk around.
@@ -50,17 +52,18 @@ The full design document is [`game.md`](game.md).
 - **Main menu**: pick a mode (Play vs AI, Create room, Join room) and press **START**; Rules, Hall, Settings, Credits and Quit are the icons at the top right.
 - **Play vs AI**: you and four AI champions.
 - **Create room / join room**: the room shows a short code such as `6C2M-9QZ`. Friends on the same network type it in **Join room**. For internet play, the host switches to the **internet code** and forwards UDP port 7777 on their router. Rooms on your network are also listed, and you can still connect by IP address.
-- **Voice chat**: hold **V** to talk (or set the microphone to *always on* / *off* in Settings). A microphone icon shows who is talking.
-- **In a match**: press **Esc** or the gear at the top right for the game menu (resume, settings, how to play, leave) with quick sliders for mouse sensitivity, field of view and volume.
+- **Voice chat**: hold **V** to talk (or set the microphone to *always on* / *off*). The mic button at the top right (or **M**) turns your microphone on and off and lights up while you are live; a microphone icon shows who is talking. In the game menu you can set the voice chat volume and mute any player (their voice and chat). Champions still in the trials can't hear eliminated players, who see every hidden symbol.
+- **The Guardian's judgement**: every eliminated champion gets a scene. Letterbox bars close in, the camera moves close, and the champion stands in grief and speaks their last words, voiced ("Today is not my day... but I hope my people survive."). They look up as a red beam gathers in the sky, then it strikes and they collapse. The Guardian speaks its verdict.
+- **In a match**: press **Esc** or the gear at the top right for the game menu (resume, settings, how to play, leave; the host can also end the match for everyone) with quick sliders for mouse sensitivity, field of view, volume and voice.
 - **Settings**: audio, voice and captions, controls (sensitivity, invert, field of view, key list) and graphics (quality, resolution, brightness, frame-rate limit, motion blur, FPS counter, fullscreen, VSync).
-- Reconnects: a disconnected player's seat is held by an AI "ghost" for 30 s in the lobby and 20 s during a match.
+- Reconnects: a disconnected player's seat is held by an AI "ghost" for 30 s in the lobby and 20 s during a match (only the same player can take it back). Leaving from the menu frees the seat at once; leaving mid-trial forfeits.
 
 | Action | Keyboard / mouse | Gamepad |
 |---|---|---|
 | Move / look | WASD / mouse | Left / right stick |
 | Sprint, jump | Left Shift, Space | Left stick click, A |
-| Interact (read a marker stone, hold the switch) | E | X |
-| Voice chat (push to talk) | V | D-pad up |
+| Interact (read a marker stone) | E | X |
+| Voice chat (push to talk), mic on/off | V, M | D-pad up |
 | Chat | Enter or T | |
 | Scoreboard, menu | Tab, Esc | View, Menu |
 | Drive (Stage 3) | W/S, A/D, Space handbrake, R reset | Triggers, left stick, B, Y |
@@ -135,8 +138,8 @@ Everything game-specific lives in the C++ module `Source/AliceInBotherland` (cla
 |---|---|
 | `Core/` | Shared types and timers (`AIBTypes`), asset loading, the save profile, and the game instance (settings, loading screen, graphics auto-detect). |
 | `Game/` | The server-authoritative match: `AAIBGameMode` is a phase machine (lobby → arrival → trials → race → choice → ending), split across `AIBGameMode*.cpp`, plus game/player state, AI champions and reconnect ghosts. |
-| `Player/` | The champion character, the Chaos offroad vehicle, and the player controller (input is built in code with Enhanced Input; cameras for every phase). |
-| `World/` | Self-building set pieces spawned locally on every machine by `UAIBWorldSubsystem`: ocean, fleet, landing site, Number room, hotel, race course, Guardian site and environment lighting. Positions are in `AIBLayout.h`; the race route is in `AIBRacePath.h`. |
+| `Player/` | The champion character (story poses for grief, judgement, the final choice and its outcome, `AIBPoses`: bones posed on a poseable copy of the animated mesh; the Guardian's judgement beam), the Chaos offroad vehicle, and the player controller (input is built in code with Enhanced Input; cameras for every phase including the judgement close-ups; voice chat). |
+| `World/` | Self-building set pieces spawned locally on every machine by `UAIBWorldSubsystem`: ocean, fleet, landing site, Number room, hotel, race course, Guardian site, island life (gulls, tumbleweeds, roadside wrecks, signposts) and environment lighting. Positions are in `AIBLayout.h`; the race route is in `AIBRacePath.h`. |
 | `Audio/` | Music crossfades, voice-over with captions, ambience per zone, and the narrator (`AIBNarration`: Alice's lines and the timed story / rules sequences). |
 | `Online/` | Sessions: Steam (App ID 480 for development) with a LAN / direct-IP fallback, and room codes (`AIBRoomCode`: the host's address packed into a short code). |
 | `UI/` | All UI is Slate in C++: main menu and profile, the room, story and rules cards, HUD, every stage panel, settings, the leaderboard. `SAIBGameUI` holds the game-style widgets (slanted buttons, icon buttons, sliders, switches, scroll wheels, reveal animations); icons come from the Material Icons font. |
@@ -155,6 +158,7 @@ in the project root (`OPENAI_API_KEY`, `ELEVENLABS_API_KEY` and optionally `ELEV
 |---|---|
 | `Tools/gen_images.py <model> all` | Generates the story, loading and trial pictures into `SourceAssets/Images/Story/`. |
 | `Tools/gen_voice.py [ids]` | Speaks the lines in `SourceAssets/Audio/narration.json` with ElevenLabs into `SourceAssets/Audio/VO/` (needs ffmpeg). |
+| `Tools/gen_last_words.py [ids]` | Speaks the champions' last words (`SourceAssets/Audio/last_words.json`, a separate survivor voice) and writes `Audio/AIBLastWordsLines.inl`. |
 | `Tools/gen_narration_table.py` | Writes `Source/AliceInBotherland/Audio/AIBNarrationLines.inl` (captions and spoken lengths) so the game's timing matches the recordings. |
 
 Imported pictures live in `Content/AliceInBotherland/UI/Story/`, the voice lines in `Content/AliceInBotherland/Audio/VO/`.

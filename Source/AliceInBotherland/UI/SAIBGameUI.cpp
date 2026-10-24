@@ -18,7 +18,7 @@
 
 namespace
 {
-	FButtonStyle InvisibleButtonStyle()
+	FButtonStyle GameUIInvisibleButtonStyle()
 	{
 		return FButtonStyle()
 			.SetNormal(FSlateNoResource())
@@ -29,19 +29,19 @@ namespace
 			.SetPressedPadding(FMargin(0.f));
 	}
 
-	const FSlateBrush* NoBrush()
+	const FSlateBrush* GameUINoBrush()
 	{
 		static const FSlateNoResource Brush;
 		return &Brush;
 	}
 
-	FLinearColor WithAlpha(FLinearColor Color, float Alpha)
+	FLinearColor GameUIWithAlpha(FLinearColor Color, float Alpha)
 	{
 		Color.A = Alpha;
 		return Color;
 	}
 
-	float EaseOut(float T)
+	float GameUIEaseOut(float T)
 	{
 		T = FMath::Clamp(T, 0.f, 1.f);
 		return 1.f - FMath::Pow(1.f - T, 3.f);
@@ -58,7 +58,7 @@ void SAIBSlantButton::Construct(const FArguments& InArgs)
 	Selected = InArgs._IsSelected;
 	Accent = InArgs._AccentColor;
 	OnClickedDelegate = InArgs._OnClicked;
-	Style = InvisibleButtonStyle();
+	Style = GameUIInvisibleButtonStyle();
 
 	const int32 Size = InArgs._FontSize;
 	const bool bCentered = InArgs._Centered;
@@ -277,7 +277,7 @@ FSlateColor SAIBSlantButton::GetEdge() const
 		return FLinearColor(1.f, 1.f, 1.f, 0.35f + 0.4f * Hover);
 	}
 	const FLinearColor A = AccentOrDefault();
-	return WithAlpha(A, Selected.Get() ? 1.f : 0.45f + 0.55f * Hover);
+	return GameUIWithAlpha(A, Selected.Get() ? 1.f : 0.45f + 0.55f * Hover);
 }
 
 FSlateColor SAIBSlantButton::GetOutline() const
@@ -292,13 +292,13 @@ FSlateColor SAIBSlantButton::GetOutline() const
 	}
 	if (Selected.Get())
 	{
-		return WithAlpha(AccentOrDefault(), 0.85f);
+		return GameUIWithAlpha(AccentOrDefault(), 0.85f);
 	}
 	if (Kind == EAIBButtonKind::Primary || Kind == EAIBButtonKind::Gold)
 	{
 		return FLinearColor(1.f, 1.f, 1.f, 0.18f + 0.3f * Hover);
 	}
-	return FMath::Lerp(FLinearColor(1.f, 1.f, 1.f, 0.1f), WithAlpha(AccentOrDefault(), 0.7f), Hover);
+	return FMath::Lerp(FLinearColor(1.f, 1.f, 1.f, 0.1f), GameUIWithAlpha(AccentOrDefault(), 0.7f), Hover);
 }
 
 FSlateColor SAIBSlantButton::GetTextColor() const
@@ -326,7 +326,7 @@ void SAIBIconButton::Construct(const FArguments& InArgs)
 {
 	Active = InArgs._IsActive;
 	OnClickedDelegate = InArgs._OnClicked;
-	Style = InvisibleButtonStyle();
+	Style = GameUIInvisibleButtonStyle();
 	const float Size = InArgs._Size;
 	TAttribute<TCHAR> IconAttr = InArgs._Icon;
 	TAttribute<FText> Label = InArgs._Label;
@@ -436,10 +436,10 @@ void SAIBReveal::Construct(const FArguments& InArgs)
 	ChildSlot
 	[
 		SNew(SBorder)
-		.BorderImage(NoBrush())
+		.BorderImage(GameUINoBrush())
 		.Padding(0.f)
 		.ColorAndOpacity_Lambda([this]() { return FLinearColor(1.f, 1.f, 1.f, Progress()); })
-		.RenderTransform_Lambda([this]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(Offset * (1.f - EaseOut(Progress())))); })
+		.RenderTransform_Lambda([this]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(Offset * (1.f - GameUIEaseOut(Progress())))); })
 		[
 			InArgs._Content.Widget
 		]
@@ -499,17 +499,17 @@ int32 SAIBSlider::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeome
 
 	auto Box = [&](float X0, float Y0, float W, float H, const FSlateBrush* Brush, const FLinearColor& Color, int32 Layer)
 	{
-		FSlateDrawElement::MakeBox(OutDrawElements, Layer, AllottedGeometry.ToPaintGeometry(FVector2f(W, H), FSlateLayoutTransform(FVector2f(X0, Y0))), Brush, ESlateDrawEffect::None, WithAlpha(Color, Color.A * Alpha));
+		FSlateDrawElement::MakeBox(OutDrawElements, Layer, AllottedGeometry.ToPaintGeometry(FVector2f(W, H), FSlateLayoutTransform(FVector2f(X0, Y0))), Brush, ESlateDrawEffect::None, GameUIWithAlpha(Color, Color.A * Alpha));
 	};
 	// Track, filled part, knob (ring + core).
 	Box(Pad, Y - TrackH * 0.5f, TrackW, TrackH, AIBStyle::RoundBrush(3.f), FLinearColor(1.f, 1.f, 1.f, 0.12f), LayerId);
 	if (F > 0.001f)
 	{
-		TArray<FSlateGradientStop> Stops = { FSlateGradientStop(FVector2D(0.f, 0.f), WithAlpha(AIBStyle::Gold(), Alpha)), FSlateGradientStop(FVector2D(TrackW * F, 0.f), WithAlpha(AIBStyle::Ember(), Alpha)) };
+		TArray<FSlateGradientStop> Stops = { FSlateGradientStop(FVector2D(0.f, 0.f), GameUIWithAlpha(AIBStyle::Gold(), Alpha)), FSlateGradientStop(FVector2D(TrackW * F, 0.f), GameUIWithAlpha(AIBStyle::Ember(), Alpha)) };
 		FSlateDrawElement::MakeGradient(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(FVector2f(TrackW * F, TrackH), FSlateLayoutTransform(FVector2f(Pad, Y - TrackH * 0.5f))), Stops, Orient_Vertical, ESlateDrawEffect::None, FVector4f(3.f, 3.f, 3.f, 3.f));
 	}
 	const float KX = Pad + TrackW * F - Knob * 0.5f;
-	Box(KX - 3.f, Y - Knob * 0.5f - 3.f, Knob + 6.f, Knob + 6.f, AIBStyle::RoundBrush((Knob + 6.f) * 0.5f), WithAlpha(AIBStyle::Ember(), IsHovered() ? 0.45f : 0.25f), LayerId + 2);
+	Box(KX - 3.f, Y - Knob * 0.5f - 3.f, Knob + 6.f, Knob + 6.f, AIBStyle::RoundBrush((Knob + 6.f) * 0.5f), GameUIWithAlpha(AIBStyle::Ember(), IsHovered() ? 0.45f : 0.25f), LayerId + 2);
 	Box(KX, Y - Knob * 0.5f, Knob, Knob, AIBStyle::RoundBrush(Knob * 0.5f), FLinearColor(0.97f, 0.95f, 0.92f, 1.f), LayerId + 3);
 	return LayerId + 4;
 }
@@ -599,7 +599,7 @@ int32 SAIBToggle::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeome
 	const FVector2f Origin(float(AllottedGeometry.GetLocalSize().X) - Size.X, (float(AllottedGeometry.GetLocalSize().Y) - Size.Y) * 0.5f);
 	const float Alpha = InWidgetStyle.GetColorAndOpacityTint().A;
 	const FLinearColor Track = FMath::Lerp(FLinearColor(1.f, 1.f, 1.f, 0.12f), FLinearColor(0.85f, 0.2f, 0.08f, 1.f), Knob);
-	FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(Origin)), AIBStyle::RoundBrush(14.f), ESlateDrawEffect::None, WithAlpha(Track, Track.A * Alpha));
+	FSlateDrawElement::MakeBox(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(Origin)), AIBStyle::RoundBrush(14.f), ESlateDrawEffect::None, GameUIWithAlpha(Track, Track.A * Alpha));
 	const float D = 22.f;
 	const FVector2f KnobPos(Origin.X + 3.f + Knob * (Size.X - D - 6.f), Origin.Y + 3.f);
 	FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 1, AllottedGeometry.ToPaintGeometry(FVector2f(D, D), FSlateLayoutTransform(KnobPos)), AIBStyle::RoundBrush(11.f), ESlateDrawEffect::None, FLinearColor(0.97f, 0.95f, 0.92f, Alpha * (IsHovered() ? 1.f : 0.92f)));
@@ -877,7 +877,7 @@ int32 SAIBShine::OnPaint(const FPaintArgs& Args, const FGeometry& AllottedGeomet
 void SAIBFeatureCard::Construct(const FArguments& InArgs)
 {
 	OnClickedDelegate = InArgs._OnClicked;
-	Style = InvisibleButtonStyle();
+	Style = GameUIInvisibleButtonStyle();
 	const FVector2D Size = InArgs._Size;
 	TSharedRef<SHorizontalBox> Bottom = SNew(SHorizontalBox)
 		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Bottom)

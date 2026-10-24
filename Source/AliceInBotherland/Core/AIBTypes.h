@@ -34,6 +34,8 @@ enum class EAIBPhase : uint8
 	FinalChoice,
 	FinalResolve,
 	EndingCinematic,
+	/** Alice tells the truth about the island (narrated pictures). */
+	Epilogue,
 	Results
 };
 
@@ -171,6 +173,63 @@ struct FAIBFinalRecord
 	UPROPERTY() bool bAuto = false;
 };
 
+/** One claim made during a Hidden Symbol round, revealed with the results (the Liar's Ledger). */
+USTRUCT(BlueprintType)
+struct FAIBClaimRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY() int32 FromSlot = INDEX_NONE;
+	UPROPERTY() int32 ToSlot = INDEX_NONE;
+	UPROPERTY() EAIBSymbol Claimed = EAIBSymbol::None;
+	/** The claim matched the receiver's real symbol. */
+	UPROPERTY() bool bTrue = false;
+	/** The receiver answered with the claimed symbol. */
+	UPROPERTY() bool bBelieved = false;
+};
+
+/** A champion the Guardian is judging: their last words, then the beam. */
+USTRUCT(BlueprintType)
+struct FAIBFallen
+{
+	GENERATED_BODY()
+
+	UPROPERTY() int32 Slot = INDEX_NONE;
+	/** Index into AIBLastWords. */
+	UPROPERTY() int32 Words = 0;
+	/** Seconds into the elimination phase when they start speaking. */
+	UPROPERTY() float SpeakAt = 0.f;
+};
+
+/** Moments of the match, shown as its story on the results screen. */
+UENUM(BlueprintType)
+enum class EAIBMatchEventKind : uint8
+{
+	None,
+	Landed,
+	RoundWin,
+	SuddenDeath,
+	Eliminated,
+	Forfeit,
+	Qualified,
+	RaceWin,
+	Crowned,
+	Sacrificed
+};
+
+USTRUCT(BlueprintType)
+struct FAIBMatchEvent
+{
+	GENERATED_BODY()
+
+	/** Seconds since the match started. */
+	UPROPERTY() float Time = 0.f;
+	UPROPERTY() EAIBMatchEventKind Kind = EAIBMatchEventKind::None;
+	UPROPERTY() int32 Slot = INDEX_NONE;
+	/** Round, stage, points or race seconds depending on the kind. */
+	UPROPERTY() int32 Value = 0;
+};
+
 /** Saved per match in the local Hall of Champions. */
 USTRUCT(BlueprintType)
 struct FAIBMatchPlayerRecord
@@ -229,6 +288,7 @@ namespace AIB
 	constexpr float Stage1Selection = 10.f;
 	constexpr float Stage1Reveal = 3.f;
 	constexpr float Stage1Results = 5.f;
+	/** Elimination without a judgement scene (nobody fell, e.g. after a forfeit). */
 	constexpr float StageElimination = 6.f;
 	constexpr float Stage2Briefing = 8.f;
 	constexpr float Stage2Communication = 30.f;
@@ -238,7 +298,6 @@ namespace AIB
 	constexpr float Stage3Countdown = 3.f;
 	constexpr float Stage3Race = 90.f;
 	constexpr float Stage3SuddenDeathRace = 45.f;
-	constexpr float SwitchHold = 3.f;
 	constexpr float Stage3Finish = 5.f;
 	constexpr float FinalBriefing = 10.f;
 	constexpr float FinalSelect = 15.f;
@@ -259,6 +318,8 @@ namespace AIB
 	ALICEINBOTHERLAND_API FText PhaseTitle(EAIBPhase Phase);
 	ALICEINBOTHERLAND_API EAIBSceneZone ZoneForPhase(EAIBPhase Phase);
 	ALICEINBOTHERLAND_API bool IsInputPhase(EAIBPhase Phase);
+	/** Story cinematics anyone can ask to skip (all humans must agree). */
+	ALICEINBOTHERLAND_API bool IsSkippablePhase(EAIBPhase Phase);
 	ALICEINBOTHERLAND_API FText EndingTitle(EAIBEnding Ending);
 	ALICEINBOTHERLAND_API FString RandomBotName(FRandomStream& Stream, const TArray<FString>& Taken);
 

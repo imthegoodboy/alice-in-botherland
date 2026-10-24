@@ -15,6 +15,7 @@ class AAIBHotelArena;
 class AAIBRaceCourse;
 class AAIBGuardianSite;
 class AAIBLoreStones;
+class AAIBIslandLife;
 class AAIBEnvironmentDirector;
 class AAIBLandingSite;
 
@@ -57,6 +58,7 @@ private:
 	TWeakObjectPtr<AAIBRaceCourse> RaceCourse;
 	TWeakObjectPtr<AAIBGuardianSite> Guardian;
 	TWeakObjectPtr<AAIBLoreStones> LoreStones;
+	TWeakObjectPtr<AAIBIslandLife> IslandLife;
 	TWeakObjectPtr<AAIBEnvironmentDirector> Environment;
 
 	EAIBSceneZone LocalZone = EAIBSceneZone::Lobby;

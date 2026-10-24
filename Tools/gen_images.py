@@ -43,6 +43,20 @@ PROMPTS = {
                  "on the right a line of ships sailing away carrying a community to safety. A lone champion silhouette stands between them, deciding.",
     "I_Welcome": "Champions stepping off a wooden pier onto the golden beach of the Last Island, ships moored behind them, "
                  "a winding path leading up towards ruins and a distant green beam of light, warm late afternoon light.",
+    # Epilogue: the truth about the island.
+    "E_Scientist": "Decades before the collapse: an elderly scientist with grey hair and round glasses in a cluttered research lab at night, "
+                   "glowing screens showing a burning ocean and failing crops, papers, globes and climate charts everywhere, "
+                   "he studies the screens with grim certainty.",
+    "E_Warning": "The same elderly scientist alone at a podium in a vast, nearly empty conference hall, rows of empty seats, "
+                 "a giant screen behind him showing a red, dying Earth; the few people present turn and walk away, ignoring him.",
+    "E_Ark": "A secret construction on a remote green island decades ago: engineers and machines carving terraces and fresh water reservoirs, "
+             "a hidden seed vault with thousands of glowing seed capsules, the elderly scientist overseeing from a cliff with blueprints in hand.",
+    "E_Keeper": "In a vast cavern beneath the island, the frail elderly scientist places his hand on a colossal hooded stone Guardian statue "
+                "as ancient machinery wakes and green light kindles in its eyes and chest; his final work, reverent and quiet.",
+    "E_Crown": "A lone champion silhouette standing on the island's highest hill at dusk under a faint crown of golden light, "
+               "the Guardian's green beam behind, the sea below empty of ships, triumphant but lonely.",
+    "E_Dawn": "Dawn over the Last Island: families stepping onto the beach from colourful patched ships, children running on the sand, "
+              "the first gardens being planted, the hooded stone Guardian watching peacefully from the hill, hopeful and warm.",
 }
 
 def generate(model, key_id):

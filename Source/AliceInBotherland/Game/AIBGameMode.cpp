@@ -13,7 +13,11 @@
 #include "World/AIBWorldSubsystem.h"
 #include "World/AIBLandingSite.h"
 #include "World/AIBLayout.h"
+#include "World/AIBLoreStones.h"
+#include "Audio/AIBLastWords.h"
+#include "TimerManager.h"
 #include "AliceInBotherland.h"
+#include "Engine/NetConnection.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/GameSession.h"
 #include "EngineUtils.h"
@@ -226,13 +230,17 @@ bool AAIBGameMode::TryReclaimSeat(AAIBPlayerController* PC)
 	// A ghost holding a seat for a disconnected human with the same name (or restored inactive state) gives it back.
 	for (AAIBPlayerState* Seated : GS->GetSeatedPlayers())
 	{
-		if (!Seated->bDisconnected || !Seated->bBot)
+		if (!Seated->bDisconnected || !Seated->bGhost)
 		{
 			continue;
 		}
-		const bool bSameSlot = PS->Slot != INDEX_NONE && PS->Slot == Seated->Slot;
-		const bool bSameName = Seated->GetPlayerName().Equals(PS->GetPlayerName(), ESearchCase::IgnoreCase);
-		if (!bSameSlot && !bSameName)
+		// The same online id, or the same name coming from the same address (nobody can take a seat by copying a name).
+		const bool bSameId = Seated->ReclaimId.IsValid() && PS->GetUniqueId().IsValid() && Seated->ReclaimId == PS->GetUniqueId();
+		UNetConnection* Connection = PC->GetNetConnection();
+		const FString Address = Connection ? Connection->LowLevelGetRemoteAddress(false) : FString();
+		const bool bSameName = Seated->GetPlayerName().Equals(PS->GetPlayerName(), ESearchCase::IgnoreCase)
+			&& (Seated->ReclaimAddress.IsEmpty() || Seated->ReclaimAddress == Address);
+		if (!bSameId && !bSameName)
 		{
 			continue;
 		}
@@ -242,6 +250,7 @@ bool AAIBGameMode::TryReclaimSeat(AAIBPlayerController* PC)
 		Seated->CopyProperties(PS);
 		PS->SetPlayerName(Name);
 		PS->bBot = false;
+		PS->bGhost = false;
 		PS->bDisconnected = false;
 		PS->ReconnectDeadline = 0.f;
 		PS->bHost = PC->IsLocalController();
@@ -257,6 +266,11 @@ bool AAIBGameMode::TryReclaimSeat(AAIBPlayerController* PC)
 		}
 		SystemChat(FText::Format(LOCTEXT("Reconnected", "{0} reconnected."), FText::FromString(Name)));
 		Cue(TEXT("SFX_Join"));
+		// Back in the middle of a symbol round: they need to see the others' symbols again.
+		if (GS->Phase == EAIBPhase::Stage2Communication || GS->Phase == EAIBPhase::Stage2Guess)
+		{
+			Stage2_SendSymbolViews(PC);
+		}
 		return true;
 	}
 	return false;
@@ -269,37 +283,82 @@ void AAIBGameMode::Logout(AController* Exiting)
 	if (PS && GS && !PS->bBot && PS->Slot != INDEX_NONE)
 	{
 		const bool bInMatch = GS->bMatchInProgress;
-		const bool bStillCompeting = !bInMatch || PS->IsActiveChampion();
-		if (bStillCompeting && GS->Phase != EAIBPhase::Results)
+		const AAIBPlayerController* LeavingPC = Cast<AAIBPlayerController>(Exiting);
+		// Left from the menu or removed by the host (as opposed to a dropped connection).
+		const bool bForGood = LeavingPC && LeavingPC->bLeftForGood;
+		const FString Name = PS->GetPlayerName();
+		const float Wait = bInMatch ? AIB::StageReconnect : AIB::LobbyReconnect;
+		if (!bInMatch)
 		{
-			// Keep the seat with a ghost while they have time to come back.
-			const FString Name = PS->GetPlayerName();
-			const int32 Slot = PS->Slot;
-			APawn* Pawn = Exiting->GetPawn();
-			AAIBBotController* Ghost = SpawnBot(INDEX_NONE, Name, true);
-			if (Ghost)
+			if (!bForGood && MakeGhost(Exiting, PS, true))
 			{
-				AAIBPlayerState* GhostPS = Ghost->GetPlayerState<AAIBPlayerState>();
-				PS->CopyProperties(GhostPS);
-				GhostPS->SetPlayerName(Name);
-				GhostPS->Slot = Slot;
-				GhostPS->bBot = true;
-				GhostPS->bReady = false;
-				GhostPS->bDisconnected = true;
-				GhostPS->ReconnectDeadline = Now() + (bInMatch ? AIB::StageReconnect : AIB::LobbyReconnect);
-				if (Pawn)
-				{
-					Exiting->UnPossess();
-					Ghost->Possess(Pawn);
-				}
+				SystemChat(FText::Format(LOCTEXT("Disconnected", "{0} disconnected. Waiting {1} seconds for them to return."), FText::FromString(Name), FText::AsNumber(FMath::RoundToInt(Wait))));
 			}
-			PS->Slot = INDEX_NONE;
-			SystemChat(FText::Format(LOCTEXT("Disconnected", "{0} disconnected. Waiting {1} seconds for them to return."),
-				FText::FromString(Name), FText::AsNumber(FMath::RoundToInt(bInMatch ? AIB::StageReconnect : AIB::LobbyReconnect))));
+			else
+			{
+				PS->Slot = INDEX_NONE;
+				SystemChat(FText::Format(LOCTEXT("LeftRoom", "{0} left the room."), FText::FromString(Name)));
+			}
+		}
+		else if (PS->IsActiveChampion() && GS->Phase != EAIBPhase::Results)
+		{
+			AAIBPlayerState* GhostPS = MakeGhost(Exiting, PS, !bForGood);
+			if (GhostPS && bForGood)
+			{
+				Eliminate(GhostPS, 0, true);
+				SystemChat(FText::Format(LOCTEXT("LeftIsland", "{0} left the island and forfeits."), FText::FromString(Name)));
+			}
+			else if (GhostPS)
+			{
+				SystemChat(FText::Format(LOCTEXT("Disconnected", "{0} disconnected. Waiting {1} seconds for them to return."), FText::FromString(Name), FText::AsNumber(FMath::RoundToInt(Wait))));
+			}
+		}
+		else
+		{
+			// Already out of the trials (or the match is over): keep their line on the leaderboard.
+			MakeGhost(Exiting, PS, false);
+			SystemChat(FText::Format(LOCTEXT("LeftMatch", "{0} left."), FText::FromString(Name)));
 		}
 		Cue(TEXT("SFX_Leave"));
 	}
 	Super::Logout(Exiting);
+}
+
+AAIBPlayerState* AAIBGameMode::MakeGhost(AController* Exiting, AAIBPlayerState* PS, bool bReclaimable)
+{
+	const AAIBGameState* GS = GetAIBGameState();
+	const FString Name = PS->GetPlayerName();
+	const int32 Slot = PS->Slot;
+	AAIBBotController* Ghost = SpawnBot(INDEX_NONE, Name, true);
+	AAIBPlayerState* GhostPS = Ghost ? Ghost->GetPlayerState<AAIBPlayerState>() : nullptr;
+	if (!GhostPS)
+	{
+		return nullptr;
+	}
+	PS->CopyProperties(GhostPS);
+	GhostPS->SetPlayerName(Name);
+	GhostPS->Slot = Slot;
+	GhostPS->bBot = true;
+	GhostPS->bHost = false;
+	GhostPS->bReady = false;
+	GhostPS->bGhost = true;
+	GhostPS->bDisconnected = bReclaimable;
+	GhostPS->ReconnectDeadline = bReclaimable ? Now() + (GS->bMatchInProgress ? AIB::StageReconnect : AIB::LobbyReconnect) : 0.f;
+	GhostPS->ReclaimId = PS->GetUniqueId();
+	if (const APlayerController* PC = Cast<APlayerController>(Exiting))
+	{
+		if (UNetConnection* Connection = PC->GetNetConnection())
+		{
+			GhostPS->ReclaimAddress = Connection->LowLevelGetRemoteAddress(false);
+		}
+	}
+	if (APawn* Pawn = Exiting->GetPawn())
+	{
+		Exiting->UnPossess();
+		Ghost->Possess(Pawn);
+	}
+	PS->Slot = INDEX_NONE;
+	return GhostPS;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -467,6 +526,10 @@ void AAIBGameMode::RequestRemoveSeat(AAIBPlayerController* PC, int32 Slot)
 	}
 	else if (APlayerController* Kicked = Cast<APlayerController>(Target->GetOwner()))
 	{
+		if (AAIBPlayerController* KickedAIB = Cast<AAIBPlayerController>(Kicked))
+		{
+			KickedAIB->bLeftForGood = true;
+		}
 		if (GameSession)
 		{
 			GameSession->KickPlayer(Kicked, LOCTEXT("Kicked", "The host removed you from the lobby."));
@@ -491,6 +554,185 @@ void AAIBGameMode::RequestStart(AAIBPlayerController* PC)
 	{
 		PC->ClientNotify(LOCTEXT("NotReady", "Every seat must be filled and every champion ready."), TEXT("SFX_Wrong"));
 	}
+}
+
+void AAIBGameMode::PoseSlot(int32 Slot, EAIBPose Pose)
+{
+	if (AAIBCharacter* Character = GetCharacterForSlot(Slot))
+	{
+		Character->PlayPose(Pose);
+	}
+}
+
+void AAIBGameMode::StopAllPoses()
+{
+	for (AAIBPlayerState* PS : GetAIBGameState()->GetSeatedPlayers())
+	{
+		if (AAIBCharacter* Character = GetCharacterForSlot(PS->Slot))
+		{
+			Character->StopPose();
+		}
+	}
+}
+
+void AAIBGameMode::PlayPhasePoses(EAIBPhase Phase)
+{
+	const AAIBGameState* GS = GetAIBGameState();
+	switch (Phase)
+	{
+	case EAIBPhase::Stage1Elimination:
+	case EAIBPhase::Stage2Elimination:
+		// The fallen stand in grief while they say their last words.
+		for (const FAIBFallen& Fallen : GS->Fallen)
+		{
+			PoseSlot(Fallen.Slot, EAIBPose::Grief);
+		}
+		break;
+	case EAIBPhase::FinalChoice:
+		// The chooser weighs it up; the other finalist watches.
+		PoseSlot(GS->GetCurrentChooserSlot(), EAIBPose::Ponder);
+		break;
+	default:
+		break;
+	}
+}
+
+void AAIBGameMode::Later(float Seconds, TFunction<void()> Action)
+{
+	FTimerHandle Handle;
+	GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, MoveTemp(Action)), FMath::Max(0.01f, Seconds * PhaseTimeScale()), false);
+	JudgementTimers.Add(Handle);
+}
+
+void AAIBGameMode::ClearJudgement()
+{
+	for (FTimerHandle& Handle : JudgementTimers)
+	{
+		GetWorldTimerManager().ClearTimer(Handle);
+	}
+	JudgementTimers.Reset();
+	GetAIBGameState()->Fallen.Reset();
+}
+
+float AAIBGameMode::BeginJudgement(int32 Stage, bool bTrialOver)
+{
+	AAIBGameState* GS = GetAIBGameState();
+	ClearJudgement();
+	const TArray<int32> Slots = PendingFallen;
+	PendingFallen.Reset();
+	const int32 Remaining = GS->CountActive();
+	FString Finalists;
+	for (const AAIBPlayerState* PS : ActivePlayers())
+	{
+		Finalists += (Finalists.IsEmpty() ? TEXT("") : TEXT("  &  ")) + PS->GetPlayerName();
+	}
+	if (Slots.Num() == 0)
+	{
+		// Nobody to judge (the fall came from a forfeit): just the verdict.
+		if (bTrialOver && Stage == 2)
+		{
+			Announce(LOCTEXT("S2Elim", "TWO CHAMPIONS REMAIN"), FText::Format(LOCTEXT("S2ElimSub", "{0}. The race to the Guardian begins."), FText::FromString(Finalists)), FLinearColor(1.f, 0.85f, 0.4f));
+			Cue(TEXT("VO_Stage2_Elim"));
+		}
+		return AIB::StageElimination;
+	}
+
+	// Each fallen champion speaks in turn; the very first fall of a match always gets the first line.
+	float T = 1.2f;
+	FString Names;
+	for (int32 Index = 0; Index < Slots.Num(); ++Index)
+	{
+		int32 Words = 0;
+		if (UsedLastWords.Num() > 0)
+		{
+			TArray<int32> Unused;
+			for (int32 Candidate = 0; Candidate < AIBLastWords::Count(); ++Candidate)
+			{
+				if (!UsedLastWords.Contains(Candidate))
+				{
+					Unused.Add(Candidate);
+				}
+			}
+			Words = Unused.Num() > 0 ? Unused[Random.RandRange(0, Unused.Num() - 1)] : Random.RandRange(0, FMath::Max(0, AIBLastWords::Count() - 1));
+		}
+		UsedLastWords.Add(Words);
+		FAIBFallen Fallen;
+		Fallen.Slot = Slots[Index];
+		Fallen.Words = Words;
+		Fallen.SpeakAt = T * PhaseTimeScale();
+		GS->Fallen.Add(Fallen);
+		const FName Line = AIBLastWords::LineId(Words);
+		Later(T, [this, Line]() { Cue(Line); });
+		T += AIBLastWords::Seconds(Words) + 0.8f;
+		if (const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slots[Index]))
+		{
+			Names += (Names.IsEmpty() ? TEXT("") : (Index == Slots.Num() - 1 ? TEXT(" AND ") : TEXT(", "))) + PS->GetPlayerName().ToUpper();
+		}
+	}
+	SetAllMovementLocked(true);
+
+	// The light gathers, they look up; the beam strikes; they fall; the Guardian speaks.
+	constexpr float Charge = 0.6f;
+	const float Strike = T + 0.4f;
+	GS->FallStrikeAt = Strike * PhaseTimeScale();
+	Later(Strike - Charge - 1.1f, [this, Slots]()
+	{
+		for (int32 Slot : Slots)
+		{
+			PoseSlot(Slot, EAIBPose::Judged);
+		}
+		Cue(TEXT("SFX_Guardian_Rumble"));
+	});
+	Later(Strike - Charge, [this, Slots]()
+	{
+		for (int32 Slot : Slots)
+		{
+			if (AAIBCharacter* Character = GetCharacterForSlot(Slot))
+			{
+				Character->MulticastJudgement();
+			}
+		}
+	});
+	Later(Strike, [this]() { Cue(TEXT("SFX_Elimination")); });
+	const FText Title = FText::Format(Slots.Num() == 1 ? LOCTEXT("FallOne", "{0} HAS FALLEN") : LOCTEXT("FallMany", "{0} HAVE FALLEN"), FText::FromString(Names));
+	const AAIBPlayerState* First = GS->GetPlayerBySlot(Slots[0]);
+	FText Subtitle;
+	if (bTrialOver && Stage == 2)
+	{
+		Subtitle = FText::Format(LOCTEXT("FallFinal", "{0}. The race to the Guardian begins."), FText::FromString(Finalists));
+	}
+	else if (Slots.Num() == 1 && First)
+	{
+		Subtitle = FText::Format(LOCTEXT("FallSub", "{0} must sail on without their champion. {1} remain."), First->GetCommunityName(), FText::AsNumber(Remaining));
+	}
+	else
+	{
+		Subtitle = FText::Format(LOCTEXT("FallSubMany", "Their people sail on without them. {0} remain."), FText::AsNumber(Remaining));
+	}
+	Later(Strike + 0.5f, [this, Title, Subtitle]() { Announce(Title, Subtitle, FLinearColor(1.f, 0.15f, 0.12f)); });
+	if (Stage == 1 || bTrialOver)
+	{
+		const FName Verdict = Stage == 1 ? FName(TEXT("VO_Stage1_Elim")) : FName(TEXT("VO_Stage2_Elim"));
+		Later(Strike + 1.6f, [this, Verdict]() { Cue(Verdict); });
+	}
+	GS->ForceNetUpdate();
+	UE_LOG(LogAIB, Log, TEXT("Judgement of %s: strike at %.1fs"), *Names, Strike);
+	return Strike + 6.f;
+}
+
+void AAIBGameMode::LogEvent(EAIBMatchEventKind Kind, int32 Slot, int32 Value)
+{
+	AAIBGameState* GS = GetAIBGameState();
+	if (!GS->bMatchInProgress || GS->Timeline.Num() >= 48)
+	{
+		return;
+	}
+	FAIBMatchEvent Event;
+	Event.Time = Now() - GS->MatchStartTime;
+	Event.Kind = Kind;
+	Event.Slot = Slot;
+	Event.Value = Value;
+	GS->Timeline.Add(Event);
 }
 
 void AAIBGameMode::RequestSetAITestMode(AAIBPlayerController* PC, bool bOn)
@@ -526,7 +768,14 @@ void AAIBGameMode::RequestSetAITestMode(AAIBPlayerController* PC, bool bOn)
 void AAIBGameMode::DiscoverLore(AController* Controller, int32 Index)
 {
 	AAIBPlayerState* PS = Controller ? Controller->GetPlayerState<AAIBPlayerState>() : nullptr;
-	if (!PS || Index < 0 || Index >= 5 || GetAIBGameState()->Phase != EAIBPhase::IslandExplore || (PS->LoreFound & (1 << Index)))
+	if (!PS || Index < 0 || Index >= AAIBLoreStones::Count || GetAIBGameState()->Phase != EAIBPhase::IslandExplore || (PS->LoreFound & (1 << Index)))
+	{
+		return;
+	}
+	// Only stones the champion actually walked up to.
+	const AAIBLoreStones* Stones = WorldSys() ? WorldSys()->GetLoreStones() : nullptr;
+	const APawn* Pawn = Controller->GetPawn();
+	if (Stones && (!Pawn || FVector::Dist2D(Pawn->GetActorLocation(), Stones->GetStoneLocation(Index)) > AAIBLoreStones::ReadRadius * 2.f))
 	{
 		return;
 	}
@@ -548,7 +797,7 @@ void AAIBGameMode::RequestSkipCinematic(AAIBPlayerController* PC)
 {
 	AAIBGameState* GS = GetAIBGameState();
 	AAIBPlayerState* PS = PC ? PC->GetPlayerState<AAIBPlayerState>() : nullptr;
-	if (!PS || (GS->Phase != EAIBPhase::ArrivalCinematic && GS->Phase != EAIBPhase::StoryIntro))
+	if (!PS || !AIB::IsSkippablePhase(GS->Phase))
 	{
 		return;
 	}
@@ -568,10 +817,18 @@ void AAIBGameMode::RequestSkipCinematic(AAIBPlayerController* PC)
 void AAIBGameMode::RequestReturnToLobby(AAIBPlayerController* PC)
 {
 	const AAIBPlayerState* PS = PC ? PC->GetPlayerState<AAIBPlayerState>() : nullptr;
-	if (PS && PS->bHost && GetAIBGameState()->Phase == EAIBPhase::Results)
+	const AAIBGameState* GS = GetAIBGameState();
+	if (!PS || !PS->bHost || !GS->bMatchInProgress)
 	{
-		ResetToLobby();
+		return;
 	}
+	if (GS->Phase != EAIBPhase::Results)
+	{
+		// The host ended the match early from the menu.
+		UE_LOG(LogAIB, Log, TEXT("Host ended the match during %s"), *UEnum::GetValueAsString(GS->Phase));
+		SystemChat(LOCTEXT("HostEnded", "The host ended the match."));
+	}
+	ResetToLobby();
 }
 
 bool AAIBGameMode::LobbyIsReady() const
@@ -652,6 +909,17 @@ void AAIBGameMode::BeginMatch()
 	GS->RaceWinnerSlot = INDEX_NONE;
 	GS->Stage1Last = FAIBStage1Round();
 	GS->Stage2Last.Reset();
+	GS->bStage1SuddenDeath = false;
+	GS->bStage2SuddenDeath = false;
+	GS->bRaceSuddenDeath = false;
+	GS->Stage1AtRisk.Reset();
+	GS->Stage2Ledger.Reset();
+	GS->Timeline.Reset();
+	GS->MatchStartTime = Now();
+	ClearJudgement();
+	PendingFallen.Reset();
+	UsedLastWords.Reset();
+	Stage1TiedRounds = 0;
 	for (AAIBPlayerState* PS : GS->GetSeatedPlayers())
 	{
 		PS->ResetForNewMatch();
@@ -707,10 +975,10 @@ void AAIBGameMode::ResetToLobby()
 	AAIBGameState* GS = GetAIBGameState();
 	Stage3_Cleanup();
 	DestroyAllPawns();
-	// Drop ghosts of players who never came back.
+	// Drop the seats of players who left (their ghosts and records).
 	for (AAIBPlayerState* PS : GS->GetSeatedPlayers())
 	{
-		if (PS->bDisconnected)
+		if (PS->bGhost)
 		{
 			RemoveBot(Cast<AAIBBotController>(PS->GetOwner()));
 			continue;
@@ -739,6 +1007,25 @@ void AAIBGameMode::ResetToLobby()
 	GS->RaceDistance.Reset();
 	GS->Stage1Round = 0;
 	GS->Stage2Round = 0;
+	GS->bStage1SuddenDeath = false;
+	GS->bStage2SuddenDeath = false;
+	GS->bRaceSuddenDeath = false;
+	GS->Stage1AtRisk.Reset();
+	GS->Stage1Participants.Reset();
+	GS->Stage2Participants.Reset();
+	GS->Stage2Ledger.Reset();
+	GS->Timeline.Reset();
+	ClearJudgement();
+	PendingFallen.Reset();
+	GS->PendingOption = EAIBFinalChoice::None;
+	GS->ConfirmEndTime = 0.f;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AAIBPlayerController* PC = Cast<AAIBPlayerController>(It->Get()))
+		{
+			PC->ClientReceiveSymbols({});
+		}
+	}
 	EnterPhase(EAIBPhase::Lobby);
 	Announce(LOCTEXT("BackToLobby", "THE BEACON CALLS AGAIN"), LOCTEXT("BackToLobbySub", "Ready up for another match"));
 }
@@ -801,6 +1088,7 @@ float AAIBGameMode::DefaultDuration(EAIBPhase Phase) const
 	case EAIBPhase::FinalChoice: return AIB::FinalSelect;
 	case EAIBPhase::FinalResolve: return AIB::FinalResolve;
 	case EAIBPhase::EndingCinematic: return AIB::EndingCinematic;
+	case EAIBPhase::Epilogue: return AIBNarration::Length(AIBNarration::EpilogueFor(GetAIBGameState()->Ending));
 	default: return 0.f;
 	}
 }
@@ -813,6 +1101,12 @@ void AAIBGameMode::EnterPhase(EAIBPhase Phase, float DurationOverride)
 	PendingPhase = EAIBPhase::None;
 	GS->ServerSetPhase(Phase, Duration);
 	UE_LOG(LogAIB, Log, TEXT("Phase -> %s (%.1fs)"), *UEnum::GetValueAsString(Phase), Duration);
+	// Poses belong to their moment; the final choice's pose carries into the ending.
+	if (Phase != EAIBPhase::FinalResolve && Phase != EAIBPhase::EndingCinematic)
+	{
+		StopAllPoses();
+	}
+	PlayPhasePoses(Phase);
 
 	switch (Phase)
 	{
@@ -833,9 +1127,19 @@ void AAIBGameMode::EnterPhase(EAIBPhase Phase, float DurationOverride)
 			PS->bWantsSkipCinematic = false;
 		}
 		break;
+	case EAIBPhase::Epilogue:
+		for (APlayerState* Raw : GS->PlayerArray)
+		{
+			if (AAIBPlayerState* PS = Cast<AAIBPlayerState>(Raw))
+			{
+				PS->bWantsSkipCinematic = false;
+			}
+		}
+		break;
 	case EAIBPhase::IslandExplore:
 	{
 		SpawnChampionsAtLanding();
+		LogEvent(EAIBMatchEventKind::Landed, INDEX_NONE);
 		Cue(TEXT("MUS_Explore"));
 		Announce(LOCTEXT("ExploreTitle", "THE LAST ISLAND"), LOCTEXT("ExploreSub", "Explore. The first trial begins soon."), FLinearColor(0.6f, 1.f, 0.5f));
 		// Bots stroll around the landing area.
@@ -953,7 +1257,23 @@ void AAIBGameMode::OnPhaseTimerExpired()
 		Stage2_AfterResults();
 		break;
 	case EAIBPhase::Stage2Elimination:
-		FadeToPhase(EAIBPhase::Stage3Briefing);
+		// A tie still to break: the sudden-death round, otherwise on to the race.
+		if (GS->bStage2SuddenDeath)
+		{
+			// The champions still in the tie walk the hotel again.
+			for (AAIBPlayerState* PS : ActivePlayers())
+			{
+				if (AAIBCharacter* Character = GetCharacterForSlot(PS->Slot))
+				{
+					Character->SetMovementLocked(false);
+				}
+			}
+			Stage2_BeginRound();
+		}
+		else
+		{
+			FadeToPhase(EAIBPhase::Stage3Briefing);
+		}
 		break;
 	case EAIBPhase::Stage3Briefing:
 		EnterPhase(EAIBPhase::Stage3Countdown);
@@ -971,14 +1291,24 @@ void AAIBGameMode::OnPhaseTimerExpired()
 		EnterPhase(EAIBPhase::FinalChoice);
 		break;
 	case EAIBPhase::FinalChoice:
-		// Timer ran out without a confirmed choice: Become the King by default.
-		Final_Commit(EAIBFinalChoice::King, true);
+		Final_TimeUp();
 		break;
 	case EAIBPhase::FinalResolve:
 		Final_AfterResolve();
 		break;
 	case EAIBPhase::EndingCinematic:
-		EnterPhase(EAIBPhase::Results);
+		// Then the truth about the island (when somebody reached the Guardian's choice).
+		if (AIBNarration::EpilogueFor(GS->Ending) != EAIBNarration::None)
+		{
+			FadeToPhase(EAIBPhase::Epilogue);
+		}
+		else
+		{
+			EnterPhase(EAIBPhase::Results);
+		}
+		break;
+	case EAIBPhase::Epilogue:
+		FadeToPhase(EAIBPhase::Results);
 		break;
 	default:
 		break;
@@ -1032,13 +1362,20 @@ void AAIBGameMode::Tick(float DeltaSeconds)
 	if (GS->Phase == EAIBPhase::Stage1Selection || GS->Phase == EAIBPhase::Stage2Guess)
 	{
 		const TArray<int32>& Participants = GS->Phase == EAIBPhase::Stage1Selection ? GS->Stage1Participants : GS->Stage2Participants;
-		bool bAll = Participants.Num() > 0;
+		// Champions who left (or are waiting to reconnect) don't hold the round up.
+		bool bAny = false;
+		bool bAll = true;
 		for (int32 Slot : Participants)
 		{
 			const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
-			bAll &= PS && PS->bSubmitted;
+			if (!PS || !PS->IsActiveChampion() || PS->bDisconnected)
+			{
+				continue;
+			}
+			bAny = true;
+			bAll &= PS->bSubmitted;
 		}
-		if (bAll && GS->PhaseEndTime - Now() > 1.2f)
+		if (bAny && bAll && GS->PhaseEndTime - Now() > 1.2f)
 		{
 			GS->PhaseEndTime = Now() + 1.2f;
 		}
@@ -1048,7 +1385,7 @@ void AAIBGameMode::Tick(float DeltaSeconds)
 	{
 		Stage3_Tick(DeltaSeconds);
 	}
-	if (GS->Phase == EAIBPhase::FinalChoice)
+	if (GS->Phase == EAIBPhase::FinalChoice && PendingPhase == EAIBPhase::None)
 	{
 		Final_Tick();
 	}
@@ -1057,6 +1394,11 @@ void AAIBGameMode::Tick(float DeltaSeconds)
 		TickAcid();
 	}
 	TickBots(DeltaSeconds);
+	if (Now() >= NextVoiceMuteUpdate)
+	{
+		NextVoiceMuteUpdate = Now() + 0.5f;
+		UpdateVoiceMutes();
+	}
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1201,7 +1543,7 @@ TArray<AAIBPlayerState*> AAIBGameMode::ActivePlayers() const
 	return GetAIBGameState()->GetActivePlayers();
 }
 
-void AAIBGameMode::Eliminate(AAIBPlayerState* PS, int32 Stage, bool bForfeit)
+void AAIBGameMode::Eliminate(AAIBPlayerState* PS, int32 Stage, bool bForfeit, bool bJudged)
 {
 	if (!PS || PS->Status != EAIBPlayerStatus::Active)
 	{
@@ -1210,17 +1552,27 @@ void AAIBGameMode::Eliminate(AAIBPlayerState* PS, int32 Stage, bool bForfeit)
 	PS->Status = bForfeit ? EAIBPlayerStatus::Forfeited : EAIBPlayerStatus::Eliminated;
 	PS->EliminatedInStage = Stage;
 	PS->ForceNetUpdate();
-	if (AAIBCharacter* Character = GetCharacterForSlot(PS->Slot))
+	LogEvent(bForfeit ? EAIBMatchEventKind::Forfeit : EAIBMatchEventKind::Eliminated, PS->Slot, Stage);
+	if (bJudged && !bForfeit)
+	{
+		PendingFallen.AddUnique(PS->Slot);
+	}
+	else if (AAIBCharacter* Character = GetCharacterForSlot(PS->Slot))
 	{
 		Character->MulticastEliminated();
 	}
 	UE_LOG(LogAIB, Log, TEXT("%s eliminated (stage %d%s)."), *PS->GetPlayerName(), Stage, bForfeit ? TEXT(", forfeit") : TEXT(""));
 
-	// Forfeit during the race: the other finalist wins immediately.
+	// Forfeit before or during the race: the other finalist reaches the Guardian unopposed.
 	AAIBGameState* GS = GetAIBGameState();
-	if (bForfeit && GS->Phase == EAIBPhase::Stage3Race && GS->Finalists.Contains(PS->Slot))
+	const bool bRacePhase = GS->Phase == EAIBPhase::Stage3Briefing || GS->Phase == EAIBPhase::Stage3Countdown || GS->Phase == EAIBPhase::Stage3Race;
+	if (bForfeit && bRacePhase && GS->RaceWinnerSlot == INDEX_NONE && GS->Finalists.Contains(PS->Slot))
 	{
-		const int32 Other = GS->Finalists.IndexOfByPredicate([PS](int32 S) { return S != PS->Slot; });
+		const int32 Other = GS->Finalists.IndexOfByPredicate([PS, GS](int32 S)
+		{
+			const AAIBPlayerState* OtherPS = GS->GetPlayerBySlot(S);
+			return S != PS->Slot && OtherPS && OtherPS->IsActiveChampion();
+		});
 		if (Other != INDEX_NONE)
 		{
 			Stage3_Claim(Other);
@@ -1301,13 +1653,16 @@ void AAIBGameMode::SubmitChat(AController* Controller, const FString& Text, int3
 		const EAIBSymbol Parsed = AIB::ParseSymbol(Clean);
 		if (Parsed != EAIBSymbol::None)
 		{
+			// The longest name mentioned as a whole word.
+			int32 BestLen = 0;
 			for (const AAIBPlayerState* Other : GS->GetSeatedPlayers())
 			{
-				if (Other != PS && Clean.Contains(Other->GetPlayerName(), ESearchCase::IgnoreCase))
+				const FString OtherName = Other->GetPlayerName();
+				if (Other != PS && OtherName.Len() > BestLen && MentionsName(Clean, OtherName))
 				{
+					BestLen = OtherName.Len();
 					Message.ToSlot = Other->Slot;
 					Message.ClaimSymbol = Parsed;
-					break;
 				}
 			}
 		}
@@ -1317,6 +1672,80 @@ void AAIBGameMode::SubmitChat(AController* Controller, const FString& Text, int3
 		Stage2Claims.Add(Message.ToSlot, TPair<int32, EAIBSymbol>(PS->Slot, Message.ClaimSymbol));
 	}
 	BroadcastChat(Message);
+}
+
+bool AAIBGameMode::MentionsName(const FString& Text, const FString& Name)
+{
+	if (Name.IsEmpty())
+	{
+		return false;
+	}
+	for (int32 From = 0;;)
+	{
+		const int32 At = Text.Find(Name, ESearchCase::IgnoreCase, ESearchDir::FromStart, From);
+		if (At == INDEX_NONE)
+		{
+			return false;
+		}
+		const int32 End = At + Name.Len();
+		if ((At == 0 || !FChar::IsAlnum(Text[At - 1])) && (End >= Text.Len() || !FChar::IsAlnum(Text[End])))
+		{
+			return true;
+		}
+		From = At + 1;
+	}
+}
+
+void AAIBGameMode::UpdateVoiceMutes()
+{
+	// While the trials run, champions still competing can't hear anyone who is out: the eliminated see every hidden symbol.
+	const AAIBGameState* GS = GetAIBGameState();
+	const bool bSeparate = GS->bMatchInProgress && GS->Phase != EAIBPhase::Results;
+	TArray<APlayerController*> Controllers;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (It->Get())
+		{
+			Controllers.Add(It->Get());
+		}
+	}
+	TArray<FAIBVoiceMute> Wanted;
+	for (APlayerController* Listener : Controllers)
+	{
+		const AAIBPlayerState* ListenerPS = Listener->GetPlayerState<AAIBPlayerState>();
+		if (!bSeparate || !ListenerPS || !ListenerPS->IsActiveChampion())
+		{
+			continue;
+		}
+		for (APlayerController* Speaker : Controllers)
+		{
+			const AAIBPlayerState* SpeakerPS = Speaker->GetPlayerState<AAIBPlayerState>();
+			if (Speaker != Listener && SpeakerPS && !SpeakerPS->IsActiveChampion() && SpeakerPS->GetUniqueId().IsValid())
+			{
+				Wanted.Add({ Listener, SpeakerPS->GetUniqueId() });
+			}
+		}
+	}
+	for (const FAIBVoiceMute& Mute : Wanted)
+	{
+		if (!VoiceMutes.Contains(Mute))
+		{
+			Mute.Listener->GameplayMutePlayer(Mute.Speaker);
+			VoiceMutes.Add(Mute);
+		}
+	}
+	for (int32 Index = VoiceMutes.Num() - 1; Index >= 0; --Index)
+	{
+		const FAIBVoiceMute& Mute = VoiceMutes[Index];
+		if (!Wanted.Contains(Mute))
+		{
+			if (APlayerController* Listener = Mute.Listener.Get())
+			{
+				Listener->GameplayUnmutePlayer(Mute.Speaker);
+			}
+			VoiceMutes.RemoveAt(Index);
+		}
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

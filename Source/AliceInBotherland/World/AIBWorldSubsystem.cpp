@@ -11,6 +11,7 @@
 #include "World/AIBRaceCourse.h"
 #include "World/AIBGuardianSite.h"
 #include "World/AIBLoreStones.h"
+#include "World/AIBIslandLife.h"
 #include "World/AIBEnvironmentDirector.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -77,6 +78,7 @@ void UAIBWorldSubsystem::EnsureWorldActors()
 	FindOrSpawn(Guardian, FTransform(Ground(AIBLayout::Guardian)));
 	FindOrSpawn(RaceCourse, FTransform(Ground(AIBLayout::RaceStart)));
 	FindOrSpawn(LoreStones, FTransform::Identity);
+	FindOrSpawn(IslandLife, FTransform::Identity);
 
 	UE_LOG(LogAIB, Log, TEXT("World set pieces ready (net mode %d)."), (int32)World->GetNetMode());
 	SetLocalZone(LocalZone);

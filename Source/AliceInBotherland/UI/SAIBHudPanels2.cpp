@@ -3,11 +3,13 @@
 #include "UI/SAIBHud.h"
 #include "UI/AIBStyle.h"
 #include "UI/SAIBWidgets.h"
+#include "UI/SAIBGameUI.h"
 #include "Player/AIBPlayerController.h"
 #include "Player/AIBVehicle.h"
 #include "Game/AIBGameState.h"
 #include "Game/AIBPlayerState.h"
 #include "World/AIBGuardianSite.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
@@ -15,6 +17,7 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/Layout/SWidgetSwitcher.h"
 
 #define LOCTEXT_NAMESPACE "AIBHudPanels2"
 
@@ -42,6 +45,24 @@ namespace
 	}
 
 	const EAIBSymbol AllSymbols[] = { EAIBSymbol::Heart, EAIBSymbol::Diamond, EAIBSymbol::Club, EAIBSymbol::Spade };
+
+	FText ClockText(float Seconds)
+	{
+		const int32 Total = FMath::Max(0, FMath::RoundToInt(Seconds));
+		return FText::FromString(FString::Printf(TEXT("%d:%02d"), Total / 60, Total % 60));
+	}
+
+	/** A suit that follows a changing symbol (None shows "?"). */
+	TSharedRef<SWidget> LiveSuit(TFunction<EAIBSymbol()> Symbol, float Size)
+	{
+		TSharedRef<SWidgetSwitcher> Switcher = SNew(SWidgetSwitcher).WidgetIndex_Lambda([Symbol]() { return int32(Symbol()); });
+		Switcher->AddSlot()[Suit(EAIBSymbol::None, Size)];
+		for (EAIBSymbol Each : AllSymbols)
+		{
+			Switcher->AddSlot()[Suit(Each, Size)];
+		}
+		return Switcher;
+	}
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -189,7 +210,7 @@ void SAIBHud::RebuildSymbolRows()
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f, 0.f)
 				[
-					Suit(PC() ? PC()->GetVisibleSymbol(Slot) : EAIBSymbol::None, 34.f)
+					LiveSuit([this, Slot]() { return PC() ? PC()->GetVisibleSymbol(Slot) : EAIBSymbol::None; }, 34.f)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
@@ -275,7 +296,9 @@ TSharedRef<SWidget> SAIBHud::MakeSymbolResults()
 		.Visibility_Lambda([this]()
 		{
 			const EAIBPhase P = Phase();
-			return P == EAIBPhase::Stage2Results || P == EAIBPhase::Stage2Elimination ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			const AAIBGameState* G = GS();
+			const bool bJudging = G && G->Fallen.Num() > 0;
+			return P == EAIBPhase::Stage2Results || (P == EAIBPhase::Stage2Elimination && !bJudging) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 		})
 		.HAlign(HAlign_Right)
 		.VAlign(VAlign_Center)
@@ -347,6 +370,59 @@ void SAIBHud::RebuildSymbolResults()
 			]
 		];
 	}
+
+	// The Liar's Ledger: who told whom what, and whether it was true.
+	if (G->Phase != EAIBPhase::Stage2Results || G->Stage2Ledger.Num() == 0)
+	{
+		return;
+	}
+	SymbolResultsBox->AddSlot().AutoHeight().Padding(0.f, 14.f, 0.f, 4.f)
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)[AIBUI::Icon(AIBIcon::Theater, 20, AIBStyle::Gold())]
+		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+		[
+			SNew(STextBlock).Text(LOCTEXT("Ledger", "THE LIAR'S LEDGER")).Font(AIBStyle::Spaced(AIBStyle::Heading(18), 120)).ColorAndOpacity(AIBStyle::Gold())
+		]
+	];
+	int32 Shown = 0;
+	for (const FAIBClaimRecord& Claim : G->Stage2Ledger)
+	{
+		const AAIBPlayerState* From = G->GetPlayerBySlot(Claim.FromSlot);
+		const AAIBPlayerState* To = G->GetPlayerBySlot(Claim.ToSlot);
+		if (!From || !To || ++Shown > 8)
+		{
+			continue;
+		}
+		const FText Verdict = Claim.bTrue ? LOCTEXT("Truth", "TRUE") : (Claim.bBelieved ? LOCTEXT("LieBelieved", "LIE - BELIEVED") : LOCTEXT("Lie", "LIE"));
+		SymbolResultsBox->AddSlot().AutoHeight().Padding(0.f, 2.f)
+		[
+			SNew(SBorder)
+			.BorderImage(AIBStyle::WhiteBrush())
+			.BorderBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.03f))
+			.Padding(FMargin(10.f, 4.f))
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(STextBlock).Text(FText::FromString(From->GetPlayerName().ToUpper())).Font(AIBStyle::SubHeading(14)).ColorAndOpacity(From->GetCommunityColor())
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.f, 0.f)
+				[
+					SNew(STextBlock).Text(LOCTEXT("Told", "told")).Font(AIBStyle::Body(13)).ColorAndOpacity(AIBStyle::TextFaint())
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(STextBlock).Text(FText::FromString(To->GetPlayerName().ToUpper())).Font(AIBStyle::SubHeading(14)).ColorAndOpacity(To->GetCommunityColor())
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f, 0.f)[Suit(Claim.Claimed, 22.f)]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).HAlign(HAlign_Right)
+				[
+					SNew(STextBlock).Text(Verdict).Font(AIBStyle::Heading(15)).ColorAndOpacity(Claim.bTrue ? AIBStyle::Acid() : AIBStyle::Blood())
+				]
+			]
+		];
+	}
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -356,12 +432,11 @@ void SAIBHud::RebuildSymbolResults()
 TSharedRef<SWidget> SAIBHud::MakeRacePanel()
 {
 	auto MyVehicle = [this]() -> AAIBVehicle* { return PC() ? Cast<AAIBVehicle>(PC()->GetPawn()) : nullptr; };
-	auto MyIndex = [this]() { const AAIBGameState* G = GS(); const AAIBPlayerState* Me = MyPS(); return G && Me ? G->Finalists.IndexOfByKey(Me->Slot) : INDEX_NONE; };
 	auto InZone = [this, MyVehicle]()
 	{
 		const AAIBGameState* G = GS();
 		const AAIBVehicle* V = MyVehicle();
-		return G && V && G->Phase == EAIBPhase::Stage3Race && FVector::Dist2D(V->GetActorLocation(), G->GuardianLocation) < AAIBGuardianSite::SwitchRadius;
+		return G && V && G->Phase == EAIBPhase::Stage3Race && FVector::Dist2D(V->GetActorLocation(), G->GuardianLocation) < AAIBGuardianSite::SwitchRadius * 2.5f;
 	};
 
 	TSharedRef<SVerticalBox> Racers = SNew(SVerticalBox);
@@ -469,17 +544,7 @@ TSharedRef<SWidget> SAIBHud::MakeRacePanel()
 						SNew(STextBlock)
 						.Font(AIBStyle::Heading(28))
 						.ColorAndOpacity(AIBStyle::Acid())
-						.Text_Lambda([MyVehicle]()
-						{
-							const AAIBVehicle* V = MyVehicle();
-							return V && V->GetSpeedKmh() > 25.f ? LOCTEXT("SlowDown", "SLOW DOWN - STOP IN THE RING") : LOCTEXT("HoldE", "HOLD [E] TO ACTIVATE THE SWITCH");
-						})
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f, 0.f, 0.f)
-					[
-						AIBUI::Bar(
-							TAttribute<float>::CreateLambda([this, MyIndex]() { const AAIBGameState* G = GS(); const int32 I = MyIndex(); return G && G->SwitchProgress.IsValidIndex(I) ? G->SwitchProgress[I] : 0.f; }),
-							TAttribute<FLinearColor>::CreateLambda([]() { return AIBStyle::Acid(); }), 10.f)
+						.Text(LOCTEXT("IntoRing", "INTO THE RING - THE GUARDIAN IS YOURS TO FACE"))
 					],
 					FMargin(20.f, 14.f))
 			]
@@ -641,7 +706,7 @@ TSharedRef<SWidget> SAIBHud::MakeResultsPanel()
 		.VAlign(VAlign_Center)
 		.Padding(FMargin(0.f, 30.f))
 		[
-			SNew(SBox).WidthOverride(1060.f)
+			SNew(SBox).WidthOverride(1400.f)
 			[
 				SNew(SBorder)
 				.BorderImage(AIBStyle::PanelSolidBrush())
@@ -865,15 +930,116 @@ void SAIBHud::RebuildResults()
 			]
 		];
 	}
-	ResultsBox->AddSlot().AutoHeight().Padding(30.f, 8.f, 30.f, 0.f)[Table];
-	ResultsBox->AddSlot().AutoHeight().Padding(44.f, 6.f, 30.f, 0.f)
+	// The match story: every moment that mattered, in order.
+	auto PlayerName = [G](int32 Slot)
+	{
+		const AAIBPlayerState* PS = G->GetPlayerBySlot(Slot);
+		return FText::FromString(PS ? PS->GetPlayerName() : FString(TEXT("?")));
+	};
+	TSharedRef<SVerticalBox> Story = SNew(SVerticalBox);
+	for (const FAIBMatchEvent& Event : G->Timeline)
+	{
+		TCHAR Glyph = AIBIcon::Star;
+		FLinearColor Color = AIBStyle::TextDim();
+		FText Line;
+		switch (Event.Kind)
+		{
+		case EAIBMatchEventKind::Landed:
+			Glyph = AIBIcon::Flag; Color = AIBStyle::Acid();
+			Line = LOCTEXT("EvLanded", "The fleet lands on the last island");
+			break;
+		case EAIBMatchEventKind::RoundWin:
+			Glyph = AIBIcon::Target; Color = AIBStyle::Gold();
+			Line = FText::Format(LOCTEXT("EvRoundWin", "{0} wins Number Game round {1}"), PlayerName(Event.Slot), Event.Value);
+			break;
+		case EAIBMatchEventKind::SuddenDeath:
+			Glyph = AIBIcon::Warning; Color = AIBStyle::Ember();
+			Line = Event.Value >= 2 ? LOCTEXT("EvSudden2", "A tie - sudden death for the final") : LOCTEXT("EvSudden1", "A tie - sudden death in the Number Game");
+			break;
+		case EAIBMatchEventKind::Eliminated:
+			Glyph = AIBIcon::Close; Color = AIBStyle::Blood();
+			Line = FText::Format(LOCTEXT("EvOut", "{0} falls in Trial {1}"), PlayerName(Event.Slot), Event.Value);
+			break;
+		case EAIBMatchEventKind::Forfeit:
+			Glyph = AIBIcon::Logout; Color = AIBStyle::TextFaint();
+			Line = FText::Format(LOCTEXT("EvForfeit", "{0} leaves the island"), PlayerName(Event.Slot));
+			break;
+		case EAIBMatchEventKind::RaceWin:
+			Glyph = AIBIcon::Car; Color = AIBStyle::Gold();
+			Line = FText::Format(LOCTEXT("EvRace", "{0} reaches the Guardian first ({1}s)"), PlayerName(Event.Slot), Event.Value);
+			break;
+		case EAIBMatchEventKind::Crowned:
+			Glyph = AIBIcon::Trophy; Color = AIBStyle::Gold();
+			Line = FText::Format(LOCTEXT("EvCrowned", "{0} takes the crown"), PlayerName(Event.Slot));
+			break;
+		case EAIBMatchEventKind::Sacrificed:
+			Glyph = AIBIcon::Heart; Color = AIBStyle::Ice();
+			Line = FText::Format(LOCTEXT("EvSacrificed", "{0} gives their life for their people"), PlayerName(Event.Slot));
+			break;
+		default:
+			continue;
+		}
+		Story->AddSlot().AutoHeight().Padding(0.f, 3.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(48.f)
+				[
+					SNew(STextBlock).Text(ClockText(Event.Time)).Font(AIBStyle::Heading(14)).ColorAndOpacity(AIBStyle::TextFaint())
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)[AIBUI::Icon(Glyph, 18, Color)]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock).Text(Line).Font(AIBStyle::Body(14)).ColorAndOpacity(AIBStyle::Text()).AutoWrapText(true)
+			]
+		];
+	}
+
+	ResultsBox->AddSlot().AutoHeight().Padding(30.f, 8.f, 30.f, 0.f)
 	[
-		SNew(STextBlock)
-		.Text(LOCTEXT("StatsLegend", "Wins: rounds won in the Number Game.   Points: correct Hidden Symbol guesses.   Stones: marker stones read on the island."))
-		.Font(AIBStyle::Body(12))
-		.ColorAndOpacity(AIBStyle::TextFaint())
-		.AutoWrapText(true)
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().FillWidth(0.66f).Padding(0.f, 0.f, 18.f, 0.f)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()[Table]
+			+ SVerticalBox::Slot().AutoHeight().Padding(14.f, 6.f, 0.f, 0.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("StatsLegend", "Wins: rounds won in the Number Game.   Points: correct Hidden Symbol guesses.   Stones: marker stones read on the island."))
+				.Font(AIBStyle::Body(12))
+				.ColorAndOpacity(AIBStyle::TextFaint())
+				.AutoWrapText(true)
+			]
+		]
+		+ SHorizontalBox::Slot().FillWidth(0.34f)
+		[
+			SNew(SBorder)
+			.BorderImage(AIBStyle::CardBrush())
+			.Padding(FMargin(16.f, 12.f))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)[AIBUI::Icon(AIBIcon::Timeline, 20, AIBStyle::Gold())]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(LOCTEXT("StoryTitle", "THE MATCH STORY")).Font(AIBStyle::Spaced(AIBStyle::Heading(17), 120)).ColorAndOpacity(AIBStyle::Gold())
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SBox).MaxDesiredHeight(330.f)
+					[
+						SNew(SScrollBox) + SScrollBox::Slot()[Story]
+					]
+				]
+			]
+		]
 	];
+
 }
 
 #undef LOCTEXT_NAMESPACE

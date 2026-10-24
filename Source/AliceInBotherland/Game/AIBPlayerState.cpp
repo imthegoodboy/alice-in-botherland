@@ -25,6 +25,7 @@ void AAIBPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME(AAIBPlayerState, Stage2Points);
 	DOREPLIFETIME(AAIBPlayerState, bSubmitted);
 	DOREPLIFETIME(AAIBPlayerState, bDisconnected);
+	DOREPLIFETIME(AAIBPlayerState, bGhost);
 	DOREPLIFETIME(AAIBPlayerState, ReconnectDeadline);
 	DOREPLIFETIME(AAIBPlayerState, FinalChoice);
 	DOREPLIFETIME(AAIBPlayerState, RaceTime);
@@ -52,7 +53,9 @@ void AAIBPlayerState::CopyProperties(APlayerState* PlayerState)
 		Other->HiddenSymbol = HiddenSymbol;
 		Other->PendingNumber = PendingNumber;
 		Other->PendingGuess = PendingGuess;
+		Other->DraftNumber = DraftNumber;
 		Other->BotTemper = BotTemper;
+		Other->LoreFound = LoreFound;
 	}
 }
 
@@ -77,6 +80,8 @@ void AAIBPlayerState::OverrideWith(APlayerState* PlayerState)
 		HiddenSymbol = Old->HiddenSymbol;
 		PendingNumber = Old->PendingNumber;
 		PendingGuess = Old->PendingGuess;
+		DraftNumber = Old->DraftNumber;
+		LoreFound = Old->LoreFound;
 		bDisconnected = false;
 		ReconnectDeadline = 0.f;
 	}
@@ -108,4 +113,5 @@ void AAIBPlayerState::ResetForNewMatch()
 	HiddenSymbol = EAIBSymbol::None;
 	PendingNumber = INDEX_NONE;
 	PendingGuess = EAIBSymbol::None;
+	DraftNumber = INDEX_NONE;
 }

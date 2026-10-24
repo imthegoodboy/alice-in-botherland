@@ -112,5 +112,7 @@ protected:
 	bool bInputLocked = true;
 
 	float StuckTime = 0.f;
+	/** Server time of the last requested reset (R): one every few seconds. */
+	float LastResetRequest = -100.f;
 	float LookYaw = 0.f;
 };

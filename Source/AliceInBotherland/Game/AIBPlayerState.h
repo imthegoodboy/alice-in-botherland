@@ -58,6 +58,10 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	bool bDisconnected = false;
 
+	/** This seat belongs to a human who left: a ghost holds it (reclaimable while bDisconnected) or keeps their record. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	bool bGhost = false;
+
 	/** Server time when a disconnected player forfeits. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	float ReconnectDeadline = 0.f;
@@ -86,6 +90,11 @@ public:
 	EAIBSymbol HiddenSymbol = EAIBSymbol::None;
 	int32 PendingNumber = INDEX_NONE;
 	EAIBSymbol PendingGuess = EAIBSymbol::None;
+	/** Number dialled in but not sent yet (used when the timer runs out first). */
+	int32 DraftNumber = INDEX_NONE;
+	/** Who may take a ghost seat back: the same online id, or the same name from the same address. */
+	FUniqueNetIdRepl ReclaimId;
+	FString ReclaimAddress;
 	/** Bot personality 0..1 (used for number strategy, honesty and final choice). */
 	float BotTemper = 0.5f;
 

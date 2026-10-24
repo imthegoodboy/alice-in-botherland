@@ -84,9 +84,13 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	bool bStage1SuddenDeath = false;
 
-	/** Slots allowed to submit in the current round (all active, or the tied ones in sudden death). */
+	/** Slots allowed to submit in the current round (every active champion). */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	TArray<int32> Stage1Participants;
+
+	/** Sudden death: everyone still picks (and moves the target), but only these tied champions can fall. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	TArray<int32> Stage1AtRisk;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	FAIBStage1Round Stage1Last;
@@ -105,6 +109,10 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	TArray<FAIBSymbolResult> Stage2Last;
 
+	/** Who told whom what this round, true or false - filled in only when the symbols are revealed. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	TArray<FAIBClaimRecord> Stage2Ledger;
+
 	// ---------------- Stage 3 : Race ----------------
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
@@ -113,7 +121,7 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	bool bRaceSuddenDeath = false;
 
-	/** Per finalist (same order as Finalists): switch hold progress 0..1. */
+	/** Per finalist (same order as Finalists): progress along the road to the Guardian, 0..1. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	TArray<float> SwitchProgress;
 
@@ -151,6 +159,25 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
 	int32 ChampionSlot = INDEX_NONE;
+
+	// ---------------- Match story ----------------
+
+	/** Server time the match began (timeline times are relative to it). */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	float MatchStartTime = 0.f;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	TArray<FAIBMatchEvent> Timeline;
+
+	// ---------------- The Guardian's judgement (elimination scenes) ----------------
+
+	/** Champions being judged in the current elimination phase, in speaking order. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	TArray<FAIBFallen> Fallen;
+
+	/** Seconds into the elimination phase when the beam strikes. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "AIB")
+	float FallStrikeAt = 0.f;
 
 	// ---------------- Helpers ----------------
 

@@ -14,7 +14,11 @@ enum class EAIBNarration : uint8
 	Stage1,
 	Stage2,
 	Stage3,
-	Final
+	Final,
+	/** The truth about the island, after the ending; the closing line depends on how it ended. */
+	EpilogueCrown,
+	EpilogueGift,
+	EpilogueSaved
 };
 
 /**
@@ -61,8 +65,10 @@ namespace AIBNarration
 	int32 BeatAt(EAIBNarration Which, float Elapsed);
 	/** True if the line is one of the sequence's beats. */
 	bool Contains(EAIBNarration Which, FName Line);
-	/** The sequence narrated during a phase (None when the phase has no narration). */
-	EAIBNarration ForPhase(EAIBPhase Phase);
+	/** The sequence narrated during a phase (None when the phase has no narration); the epilogue depends on the ending. */
+	EAIBNarration ForPhase(EAIBPhase Phase, EAIBEnding Ending = EAIBEnding::None);
+	/** The epilogue for an ending (None when nobody reached the Guardian's choice). */
+	EAIBNarration EpilogueFor(EAIBEnding Ending);
 	/** Texture asset path for an image id (e.g. "S3_Island"). */
 	FString ImagePath(FName Image);
 }
