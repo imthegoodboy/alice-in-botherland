@@ -321,6 +321,12 @@ void AAIBVehicle::ResetTo(const FTransform& Transform)
 void AAIBVehicle::ServerRequestReset_Implementation()
 {
 	// Upright in place, a little higher, keep heading.
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastResetRequest < 3.f)
+	{
+		return;
+	}
+	LastResetRequest = Now;
 	const FRotator Yaw(0.f, GetActorRotation().Yaw, 0.f);
 	ResetTo(FTransform(Yaw, GetActorLocation() + FVector(0.f, 0.f, 150.f)));
 }

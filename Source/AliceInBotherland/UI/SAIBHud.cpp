@@ -6,6 +6,7 @@
 #include "UI/SAIBGameUI.h"
 #include "UI/SAIBLoadingScreen.h"
 #include "UI/SAIBStoryCards.h"
+#include "Audio/AIBLastWords.h"
 #include "Player/AIBPlayerController.h"
 #include "Player/AIBCharacter.h"
 #include "Player/AIBVehicle.h"
@@ -177,6 +178,7 @@ void SAIBHud::Construct(const FArguments& InArgs)
 			case EAIBPhase::Stage3Briefing:
 			case EAIBPhase::FinalBriefing:
 			case EAIBPhase::EndingCinematic:
+			case EAIBPhase::Epilogue:
 				Alpha = 1.f - FMath::Clamp((Now - G->PhaseStartTime) / 1.2f, 0.f, 1.f);
 				break;
 			default:
@@ -208,7 +210,9 @@ void SAIBHud::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot()[MakeResultsPanel()]
 		+ SOverlay::Slot()[MakeExplorePanel()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center).Padding(0.f, 40.f, 36.f, 0.f)[MakeRulesCard()]
+		+ SOverlay::Slot()[MakeFallScene()]
 		+ SOverlay::Slot()[MakeStoryLayer()]
+		+ SOverlay::Slot()[MakeEpilogueVerdict()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom)
 		.Padding(TAttribute<FMargin>::CreateLambda([this]()
 		{
@@ -241,11 +245,41 @@ void SAIBHud::Construct(const FArguments& InArgs)
 				return bPauseOpen || bRoom ? EVisibility::Collapsed : EVisibility::Visible;
 			})
 			[
-				SNew(SAIBIconButton)
-				.Icon(AIBIcon::Settings)
-				.Label(LOCTEXT("MenuButton", "MENU  ESC"))
-				.Size(46.f)
-				.OnClicked_Lambda([this]() { TogglePause(); return FReply::Handled(); })
+				SNew(SHorizontalBox)
+				// Microphone: shows off / push-to-talk / open, lights up while sending. M toggles it from anywhere.
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 12.f, 0.f)
+				[
+					SNew(SAIBIconButton)
+					.Icon_Lambda([this]() { return PC() && PC()->GetMicMode() == 0 ? AIBIcon::MicOff : AIBIcon::Mic; })
+					.Label_Lambda([this]()
+					{
+						if (!PC())
+						{
+							return FText::GetEmpty();
+						}
+						if (PC()->IsSpeaking())
+						{
+							return LOCTEXT("MicLive", "LIVE");
+						}
+						switch (PC()->GetMicMode())
+						{
+						case 0: return LOCTEXT("MicHudOff", "MIC OFF  M");
+						case 2: return LOCTEXT("MicHudOn", "MIC ON  M");
+						default: return LOCTEXT("MicHudPtt", "HOLD V");
+						}
+					})
+					.Size(46.f)
+					.IsActive_Lambda([this]() { return PC() && PC()->IsSpeaking(); })
+					.OnClicked_Lambda([this]() { if (PC()) PC()->ToggleMicMute(); return FReply::Handled(); })
+				]
+				+ SHorizontalBox::Slot().AutoWidth()
+				[
+					SNew(SAIBIconButton)
+					.Icon(AIBIcon::Settings)
+					.Label(LOCTEXT("MenuButton", "MENU  ESC"))
+					.Size(46.f)
+					.OnClicked_Lambda([this]() { TogglePause(); return FReply::Handled(); })
+				]
 			]
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(10.f, 8.f, 0.f, 0.f)[SNew(SAIBFpsCounter)]
@@ -415,6 +449,11 @@ TSharedRef<SWidget> SAIBHud::MakeTopBar()
 		{
 			return EVisibility::Collapsed;
 		}
+		// No clock over the Guardian's judgement.
+		if (G->Fallen.Num() > 0 && (G->Phase == EAIBPhase::Stage1Elimination || G->Phase == EAIBPhase::Stage2Elimination))
+		{
+			return EVisibility::Collapsed;
+		}
 		switch (G->Phase)
 		{
 		case EAIBPhase::Lobby:
@@ -422,6 +461,7 @@ TSharedRef<SWidget> SAIBHud::MakeTopBar()
 		case EAIBPhase::StoryIntro:
 		case EAIBPhase::ArrivalCinematic:
 		case EAIBPhase::EndingCinematic:
+		case EAIBPhase::Epilogue:
 		case EAIBPhase::Results:
 		case EAIBPhase::Stage3Countdown:
 			return EVisibility::Collapsed;
@@ -482,12 +522,12 @@ TSharedRef<SWidget> SAIBHud::MakeTopBar()
 						{
 						case EAIBPhase::Stage1RoundIntro:
 						case EAIBPhase::Stage1Selection:
-							return G->bStage1SuddenDeath ? LOCTEXT("SubSD", "Sudden death between the tied champions") : FText::Format(LOCTEXT("SubRound", "Round {0}"), G->Stage1Round);
+							return G->bStage1SuddenDeath ? LOCTEXT("SubSD", "Sudden death - everyone picks, only the tied can fall") : FText::Format(LOCTEXT("SubRound", "Round {0}"), G->Stage1Round);
 						case EAIBPhase::Stage2Communication:
 						case EAIBPhase::Stage2Guess:
 							return G->bStage2SuddenDeath ? LOCTEXT("SubSD2", "Sudden death round") : FText::Format(LOCTEXT("SubRound2", "Symbol round {0} of 3"), G->Stage2Round);
 						case EAIBPhase::Stage3Race:
-							return G->bRaceSuddenDeath ? LOCTEXT("SubSD3", "Sudden death race") : LOCTEXT("SubRace", "First to hold the switch for 3 seconds");
+							return G->bRaceSuddenDeath ? LOCTEXT("SubSD3", "Sudden death race") : LOCTEXT("SubRace", "First into the Guardian's ring takes the first choice");
 						case EAIBPhase::FinalChoice:
 						{
 							const AAIBPlayerState* Chooser = G->GetPlayerBySlot(G->GetCurrentChooserSlot());
@@ -681,6 +721,10 @@ TSharedRef<SWidget> SAIBHud::MakeSeatRow(int32 Slot)
 						{
 							return PS->bSubmitted ? FText::FromString(TEXT("LOCKED")) : FText::FromString(TEXT("..."));
 						}
+						if (G->bStage1SuddenDeath && G->Stage1AtRisk.Contains(PS->Slot) && G->Phase >= EAIBPhase::Stage1RoundIntro && G->Phase <= EAIBPhase::Stage1Results)
+						{
+							return LOCTEXT("AtRisk", "AT RISK");
+						}
 						if (AIB::ZoneForPhase(G->Phase) == EAIBSceneZone::Hotel && PS->IsActiveChampion())
 						{
 							return FText::Format(LOCTEXT("Pts", "{0} PT"), PS->Stage2Points);
@@ -695,9 +739,14 @@ TSharedRef<SWidget> SAIBHud::MakeSeatRow(int32 Slot)
 						}
 						return FText::GetEmpty();
 					})
-					.ColorAndOpacity_Lambda([Seat]()
+					.ColorAndOpacity_Lambda([this, Seat]()
 					{
 						const AAIBPlayerState* PS = Seat();
+						const AAIBGameState* G = GS();
+						if (PS && G && G->bStage1SuddenDeath && G->Stage1AtRisk.Contains(PS->Slot) && G->Phase != EAIBPhase::Stage1Selection)
+						{
+							return FSlateColor(AIBStyle::Blood());
+						}
 						return FSlateColor(PS && PS->bSubmitted ? AIBStyle::Acid() : AIBStyle::Gold());
 					})
 				]
@@ -720,11 +769,16 @@ TSharedRef<SWidget> SAIBHud::MakeRoster()
 			{
 				return EVisibility::Collapsed;
 			}
+			if (G->Fallen.Num() > 0 && (G->Phase == EAIBPhase::Stage1Elimination || G->Phase == EAIBPhase::Stage2Elimination))
+			{
+				return EVisibility::Collapsed;
+			}
 			switch (G->Phase)
 			{
 			case EAIBPhase::StoryIntro:
 			case EAIBPhase::ArrivalCinematic:
 			case EAIBPhase::EndingCinematic:
+			case EAIBPhase::Epilogue:
 			case EAIBPhase::Results:
 			case EAIBPhase::LobbyCountdown:
 				return EVisibility::Collapsed;
@@ -913,7 +967,7 @@ TSharedRef<SWidget> SAIBHud::MakeSubtitles()
 			}
 			// Lines already written on the story screen or the rules card are not captioned twice.
 			const AAIBGameState* G = GS();
-			const EAIBNarration Which = G ? AIBNarration::ForPhase(G->Phase) : EAIBNarration::None;
+			const EAIBNarration Which = G ? AIBNarration::ForPhase(G->Phase, G->Ending) : EAIBNarration::None;
 			if (G && SAIBStoryCards::IsShowing(Which, G->GetPhaseElapsed()) && AIBNarration::Contains(Which, A->GetSubtitleLine()))
 			{
 				return EVisibility::Collapsed;
@@ -991,9 +1045,10 @@ TSharedRef<SWidget> SAIBHud::MakeHints()
 			{
 			case EAIBPhase::StoryIntro:
 			case EAIBPhase::ArrivalCinematic:
+			case EAIBPhase::Epilogue:
 				return PC() && PC()->HasLocallySkipped() ? LOCTEXT("HintSkipped", "Waiting for the others to skip...") : LOCTEXT("HintSkip", "[SPACE] Skip");
 			case EAIBPhase::IslandExplore:
-				return LOCTEXT("HintExplore", "WASD move   SHIFT sprint   SPACE jump   E read stone   V talk   ENTER chat   TAB scores");
+				return LOCTEXT("HintExplore", "WASD move   SHIFT sprint   E read stone   V talk   M mic   ENTER chat   TAB scores");
 			case EAIBPhase::Stage1Briefing:
 			case EAIBPhase::Stage2Briefing:
 				return LOCTEXT("HintBrief", "WASD move   V talk   ENTER chat   TAB scores");
@@ -1002,7 +1057,7 @@ TSharedRef<SWidget> SAIBHud::MakeHints()
 			case EAIBPhase::Stage3Briefing:
 			case EAIBPhase::Stage3Countdown:
 			case EAIBPhase::Stage3Race:
-				return LOCTEXT("HintRace", "W/S throttle   A/D steer   SPACE handbrake   R reset   hold E on the switch");
+				return LOCTEXT("HintRace", "W/S throttle   A/D steer   SPACE handbrake   R reset   first into the Guardian's ring wins");
 			default:
 				return FText::GetEmpty();
 			}
@@ -1015,7 +1070,8 @@ TSharedRef<SWidget> SAIBHud::MakeSpectatorBar()
 		.Visibility_Lambda([this]()
 		{
 			const AAIBGameState* G = GS();
-			const bool bShow = PC() && PC()->IsSpectating() && G && G->Phase != EAIBPhase::Results && G->Phase != EAIBPhase::EndingCinematic;
+			const bool bShow = PC() && PC()->IsSpectating() && G && G->Phase != EAIBPhase::Results && G->Phase != EAIBPhase::EndingCinematic && G->Phase != EAIBPhase::Epilogue
+				&& !(G->Fallen.Num() > 0 && (G->Phase == EAIBPhase::Stage1Elimination || G->Phase == EAIBPhase::Stage2Elimination));
 			return bShow ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 		})
 		.BorderImage(AIBStyle::PanelBrush())
@@ -1041,11 +1097,16 @@ TSharedRef<SWidget> SAIBHud::MakeSpectatorBar()
 TSharedRef<SWidget> SAIBHud::MakeStoryLayer()
 {
 	return SNew(SBox)
-		.Visibility_Lambda([this]() { return Phase() == EAIBPhase::StoryIntro ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		.Visibility_Lambda([this]() { return Phase() == EAIBPhase::StoryIntro || Phase() == EAIBPhase::Epilogue ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SAIBStoryCards)
 			.Fullscreen(true)
-			.Sequence(EAIBNarration::Story)
+			// The opening story, or (after the ending) the truth about the island.
+			.Sequence_Lambda([this]()
+			{
+				const AAIBGameState* G = GS();
+				return G && G->Phase == EAIBPhase::Epilogue ? AIBNarration::EpilogueFor(G->Ending) : EAIBNarration::Story;
+			})
 			.Elapsed_Lambda([this]() { const AAIBGameState* G = GS(); return G ? G->GetPhaseElapsed() : 0.f; })
 		];
 }
@@ -1161,6 +1222,212 @@ TSharedRef<SWidget> SAIBHud::MakeExplorePanel()
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// The Guardian's judgement and the epilogue's verdict
+// ---------------------------------------------------------------------------------------------------------------------
+
+TSharedRef<SWidget> SAIBHud::MakeFallScene()
+{
+	auto InScene = [this]()
+	{
+		const AAIBGameState* G = GS();
+		return G && G->Fallen.Num() > 0 && (G->Phase == EAIBPhase::Stage1Elimination || G->Phase == EAIBPhase::Stage2Elimination);
+	};
+	// Letterbox bars slide in as the scene starts.
+	auto BarHeight = [this, InScene]()
+	{
+		const AAIBGameState* G = GS();
+		return InScene() && G ? 110.f * FMath::SmoothStep(0.f, 0.8f, G->GetPhaseElapsed()) : 0.f;
+	};
+	// The fallen champion speaking now (until the beam comes).
+	auto Speaking = [this]() -> const FAIBFallen*
+	{
+		const AAIBGameState* G = GS();
+		if (!G || G->Fallen.Num() == 0)
+		{
+			return nullptr;
+		}
+		const float Elapsed = G->GetPhaseElapsed();
+		const FAIBFallen* Current = nullptr;
+		for (const FAIBFallen& Fallen : G->Fallen)
+		{
+			if (Elapsed >= Fallen.SpeakAt - 0.2f)
+			{
+				Current = &Fallen;
+			}
+		}
+		return Elapsed < G->FallStrikeAt - 0.7f ? Current : nullptr;
+	};
+	auto QuoteAlpha = [this, Speaking]()
+	{
+		const AAIBGameState* G = GS();
+		const FAIBFallen* Fallen = Speaking();
+		if (!G || !Fallen)
+		{
+			return 0.f;
+		}
+		const float Elapsed = G->GetPhaseElapsed();
+		// Fades in as they start, out before the next speaker or the beam.
+		float End = G->FallStrikeAt - 0.7f;
+		for (const FAIBFallen& Other : G->Fallen)
+		{
+			if (Other.SpeakAt > Fallen->SpeakAt)
+			{
+				End = FMath::Min(End, Other.SpeakAt - 0.2f);
+			}
+		}
+		return FMath::Min(FMath::Clamp((Elapsed - Fallen->SpeakAt + 0.2f) / 0.6f, 0.f, 1.f), FMath::Clamp((End - Elapsed) / 0.5f, 0.f, 1.f));
+	};
+	auto Flash = [this, InScene]()
+	{
+		const AAIBGameState* G = GS();
+		if (!InScene() || !G)
+		{
+			return FLinearColor::Transparent;
+		}
+		const float Since = G->GetPhaseElapsed() - G->FallStrikeAt;
+		const float Alpha = Since < 0.f ? 0.f : 0.55f * FMath::Max(0.f, 1.f - Since / 0.9f);
+		return FLinearColor(0.9f, 0.04f, 0.02f, Alpha);
+	};
+
+	return SNew(SOverlay)
+		.Visibility_Lambda([InScene]() { return InScene() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		+ SOverlay::Slot().VAlign(VAlign_Top)
+		[
+			SNew(SBox).HeightOverride_Lambda(BarHeight)[SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(FLinearColor::Black)]
+		]
+		+ SOverlay::Slot().VAlign(VAlign_Bottom)
+		[
+			SNew(SBox).HeightOverride_Lambda(BarHeight)[SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(FLinearColor::Black)]
+		]
+		+ SOverlay::Slot()
+		[
+			SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor_Lambda([Flash]() { return FSlateColor(Flash()); })
+		]
+		// Last words, in the lower third above the bottom bar.
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 150.f)
+		[
+			SNew(SBox)
+			.WidthOverride(1300.f)
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::WhiteBrush())
+				.BorderBackgroundColor(FLinearColor::Transparent)
+				.Padding(0.f)
+				.ColorAndOpacity_Lambda([QuoteAlpha]() { return FLinearColor(1.f, 1.f, 1.f, QuoteAlpha()); })
+				[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					SNew(STextBlock)
+					.Font(AIBStyle::Story(40))
+					.ColorAndOpacity(FLinearColor(0.97f, 0.94f, 0.88f))
+					.ShadowOffset(FVector2D(2.f, 2.f))
+					.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f))
+					.Justification(ETextJustify::Center)
+					.AutoWrapText(true)
+					.Text_Lambda([Speaking]()
+					{
+						const FAIBFallen* Fallen = Speaking();
+						return Fallen ? FText::Format(LOCTEXT("LastWordsQuote", "\u201C{0}\u201D"), AIBLastWords::Text(Fallen->Words)) : FText::GetEmpty();
+					})
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 14.f, 0.f, 0.f)
+				[
+					SNew(STextBlock)
+					.Font(AIBStyle::Spaced(AIBStyle::SubHeading(20), 260))
+					.ShadowOffset(FVector2D(1.f, 1.f))
+					.ColorAndOpacity_Lambda([this, Speaking]()
+					{
+						const FAIBFallen* Fallen = Speaking();
+						return FSlateColor(Fallen ? AIB::Community(Fallen->Slot).Color : AIBStyle::Text());
+					})
+					.Text_Lambda([this, Speaking]()
+					{
+						const FAIBFallen* Fallen = Speaking();
+						const AAIBGameState* G = GS();
+						const AAIBPlayerState* PS = Fallen && G ? G->GetPlayerBySlot(Fallen->Slot) : nullptr;
+						return PS ? FText::Format(LOCTEXT("LastWordsBy", "{0}  -  CHAMPION OF {1}"), FText::FromString(PS->GetPlayerName().ToUpper()), PS->GetCommunityName().ToUpper()) : FText::GetEmpty();
+					})
+				]
+				]
+			]
+		];
+}
+
+TSharedRef<SWidget> SAIBHud::MakeEpilogueVerdict()
+{
+	// Shows over the epilogue's last picture: the champion the island chose, or that nobody claimed it.
+	auto Alpha = [this]()
+	{
+		const AAIBGameState* G = GS();
+		if (!G || G->Phase != EAIBPhase::Epilogue)
+		{
+			return 0.f;
+		}
+		const EAIBNarration Which = AIBNarration::EpilogueFor(G->Ending);
+		const AIBNarration::FSequence& Sequence = AIBNarration::Get(Which);
+		if (Sequence.Starts.Num() == 0)
+		{
+			return 0.f;
+		}
+		return FMath::Clamp((G->GetPhaseElapsed() - Sequence.Starts.Last() - 0.8f) / 1.2f, 0.f, 1.f);
+	};
+	auto Champion = [this]() -> const AAIBPlayerState*
+	{
+		const AAIBGameState* G = GS();
+		return G && G->Ending != EAIBEnding::DoubleSacrifice && G->Ending != EAIBEnding::SoloSacrifice ? G->GetPlayerBySlot(G->ChampionSlot) : nullptr;
+	};
+	return SNew(SBox)
+		.Visibility_Lambda([Alpha]() { return Alpha() > 0.f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		.HAlign(HAlign_Center)
+		.VAlign(VAlign_Center)
+		.Padding(FMargin(0.f, 0.f, 0.f, 330.f))
+		[
+			SNew(SBorder)
+			.BorderImage(AIBStyle::WhiteBrush())
+			.BorderBackgroundColor(FLinearColor::Transparent)
+			.Padding(0.f)
+			.ColorAndOpacity_Lambda([Alpha]() { return FLinearColor(1.f, 1.f, 1.f, Alpha()); })
+			[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Spaced(AIBStyle::StoryBold(24), 300))
+				.ColorAndOpacity(AIBStyle::Gold())
+				.ShadowOffset(FVector2D(2.f, 2.f))
+				.Text_Lambda([Champion]() { return Champion() ? LOCTEXT("VerdictChosen", "THE ISLAND HAS CHOSEN") : LOCTEXT("VerdictNone", "THE ISLAND REMAINS UNCLAIMED"); })
+			]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Title(120))
+				.ShadowOffset(FVector2D(3.f, 3.f))
+				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.7f))
+				.ColorAndOpacity_Lambda([Champion]() { const AAIBPlayerState* PS = Champion(); return FSlateColor(PS ? PS->GetCommunityColor() : FLinearColor(0.85f, 0.95f, 1.f)); })
+				.Text_Lambda([Champion]()
+				{
+					const AAIBPlayerState* PS = Champion();
+					return PS ? FText::FromString(PS->GetPlayerName().ToUpper()) : LOCTEXT("VerdictSaved", "THEY CHOSE EACH OTHER");
+				})
+			]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+			[
+				SNew(STextBlock)
+				.Font(AIBStyle::Story(26))
+				.ColorAndOpacity(AIBStyle::Text())
+				.ShadowOffset(FVector2D(2.f, 2.f))
+				.Text_Lambda([Champion]()
+				{
+					const AAIBPlayerState* PS = Champion();
+					return PS ? FText::Format(LOCTEXT("VerdictOf", "of {0}"), PS->GetCommunityName()) : LOCTEXT("VerdictSavedSub", "and every community lives on");
+				})
+			]
+			]
+		];
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Scoreboard & pause
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -1239,9 +1506,9 @@ TSharedRef<SWidget> SAIBHud::MakeRules(bool bCompact)
 	struct FRule { FText Title; FText Body; FLinearColor Color; };
 	const FRule Rules[] =
 	{
-		{ LOCTEXT("R1T", "STAGE 1 - THE NUMBER GAME"), LOCTEXT("R1B", "Everyone secretly picks 0-100. Target = average x 0.8. Closest wins the round; FARTHEST IS ELIMINATED. Ties for farthest play sudden death. No pick in 10 s = random number."), AIBStyle::Blood() },
+		{ LOCTEXT("R1T", "STAGE 1 - THE NUMBER GAME"), LOCTEXT("R1B", "Everyone secretly picks 0-100. Target = average x 0.8. Closest wins the round; FARTHEST IS ELIMINATED. A tie for farthest: everyone picks again, but only the tied can fall. Not locked in: your dial counts; no number at all = random."), AIBStyle::Blood() },
 		{ LOCTEXT("R2T", "STAGE 2 - THE HIDDEN SYMBOL"), LOCTEXT("R2B", "Each champion carries a symbol everyone can see except them (symbols can repeat). Talk for 30 s - others may lie - then guess your own. 3 rounds; the top 2 advance."), AIBStyle::Ice() },
-		{ LOCTEXT("R3T", "STAGE 3 - RACE TO THE GUARDIAN"), LOCTEXT("R3B", "The two finalists race to the beam of light and hold [E] on the switch for 3 s. Winning only earns the FIRST CHOICE. 90 s, then a shorter 45 s sudden-death race."), AIBStyle::Acid() },
+		{ LOCTEXT("R3T", "STAGE 3 - RACE TO THE GUARDIAN"), LOCTEXT("R3B", "The two finalists race to the beam of light. The first to drive into the Guardian's glowing ring wins the FIRST CHOICE - not the island. 90 s, then a shorter 45 s sudden-death race."), AIBStyle::Acid() },
 		{ LOCTEXT("R4T", "THE GUARDIAN'S CHOICE"), LOCTEXT("R4B", "BECOME THE KING: you win, your community is lost. SAVE YOUR PEOPLE: you die, your community is saved and the choice passes on. No choice in time = King."), AIBStyle::Gold() }
 	};
 	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
@@ -1347,6 +1614,88 @@ TSharedRef<SWidget> SAIBHud::MakePauseMenu()
 		];
 	}
 
+	// Other champions' voices: mute anyone (their chat too).
+	TSharedRef<SVerticalBox> VoiceRows = SNew(SVerticalBox);
+	auto AnyOtherHuman = [this]()
+	{
+		const AAIBGameState* G = GS();
+		if (!G)
+		{
+			return false;
+		}
+		for (const AAIBPlayerState* PS : G->GetSeatedPlayers())
+		{
+			if (!PS->bBot && PS != MyPS())
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+	for (int32 Slot = 0; Slot < AIB::MaxPlayers; ++Slot)
+	{
+		auto Seat = [this, Slot]() -> const AAIBPlayerState* { const AAIBGameState* G = GS(); return G ? G->GetPlayerBySlot(Slot) : nullptr; };
+		auto IsOther = [this, Seat]() { const AAIBPlayerState* PS = Seat(); return PS && !PS->bBot && PS != MyPS(); };
+		auto IsMuted = [this, Seat]() { return PC() && PC()->IsMutedLocally(Seat()); };
+		VoiceRows->AddSlot().AutoHeight().Padding(0.f, 2.f)
+		[
+			SNew(SBox)
+			.Visibility_Lambda([IsOther]() { return IsOther() ? EVisibility::Visible : EVisibility::Collapsed; })
+			[
+				SNew(SBorder)
+				.BorderImage(AIBStyle::WhiteBrush())
+				.BorderBackgroundColor(FLinearColor(1.f, 1.f, 1.f, 0.035f))
+				.Padding(FMargin(14.f, 5.f, 8.f, 5.f))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)
+					[
+						SNew(SBox).WidthOverride(4.f).HeightOverride(26.f)
+						[
+							SNew(SBorder).BorderImage(AIBStyle::WhiteBrush()).BorderBackgroundColor(AIB::Community(Slot).Color)
+						]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Font(AIBStyle::BodyMedium(17))
+						.ColorAndOpacity_Lambda([IsMuted]() { return FSlateColor(IsMuted() ? AIBStyle::TextFaint() : AIBStyle::Text()); })
+						.Text_Lambda([Seat]() { const AAIBPlayerState* PS = Seat(); return PS ? FText::FromString(PS->GetPlayerName()) : FText::GetEmpty(); })
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f, 0.f)
+					[
+						AIBUI::TalkDot(TAttribute<bool>::CreateLambda([Seat, IsMuted]() { const AAIBPlayerState* PS = Seat(); return PS && PS->bTalking && !IsMuted(); }))
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)
+					[
+						SNew(STextBlock)
+						.Font(AIBStyle::IconFont(20))
+						.Text_Lambda([IsMuted]() { return AIBIcon::Glyph(IsMuted() ? AIBIcon::VolumeOff : AIBIcon::Volume); })
+						.ColorAndOpacity_Lambda([IsMuted]() { return FSlateColor(IsMuted() ? AIBStyle::Blood() : AIBStyle::TextDim()); })
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(SAIBSlantButton)
+						.Text_Lambda([IsMuted]() { return IsMuted() ? LOCTEXT("Unmute", "UNMUTE") : LOCTEXT("Mute", "MUTE"); })
+						.FontSize(14)
+						.Height(32.f)
+						.MinWidth(96.f)
+						.Centered(true)
+						.IsSelected_Lambda(IsMuted)
+						.OnClicked_Lambda([this, Seat]() { if (PC()) PC()->ToggleMuteLocally(Seat()); return FReply::Handled(); })
+					]
+				]
+			]
+		];
+	}
+	VoiceRows->AddSlot().AutoHeight().Padding(0.f, 2.f)
+	[
+		SNew(STextBlock)
+		.Visibility_Lambda([AnyOtherHuman]() { return AnyOtherHuman() ? EVisibility::Collapsed : EVisibility::Visible; })
+		.Text(LOCTEXT("NoVoices", "Only AI champions with you - nobody to hear."))
+		.Font(AIBStyle::Body(14)).ColorAndOpacity(AIBStyle::TextFaint())
+	];
+
 	TSharedRef<SWidget> QuickSettings = SNew(SBox)
 		.WidthOverride(640.f)
 		[
@@ -1365,7 +1714,25 @@ TSharedRef<SWidget> SAIBHud::MakePauseMenu()
 				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QFov", "Field of view"), QuickSlider(&FAIBSettings::FieldOfView, 60.f, 110.f, 1.f, false))]
 				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QMaster", "Master volume"), QuickSlider(&FAIBSettings::MasterVolume, 0.f, 1.f, 0.01f, true))]
 				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QVoice", "Narrator voice"), QuickSlider(&FAIBSettings::VoiceVolume, 0.f, 1.f, 0.01f, true))]
-				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QMic", "Microphone"), MicChoices)]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QMic", "Microphone  (M)"), MicChoices)]
+				+ SVerticalBox::Slot().AutoHeight()[QuickRow(LOCTEXT("QVoiceChat", "Voice chat volume"), QuickSlider(&FAIBSettings::VoiceChatVolume, 0.f, 1.5f, 0.01f, true))]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f, 0.f, 4.f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f, 0.f)[AIBUI::Icon(AIBIcon::Voice, 18, AIBStyle::Gold())]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock).Text(LOCTEXT("VoicesTitle", "VOICES")).Font(AIBStyle::Spaced(AIBStyle::SubHeading(14), 200)).ColorAndOpacity(AIBStyle::Gold())
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Visibility_Lambda([this]() { const AAIBGameState* G = GS(); return G && G->bMatchInProgress ? EVisibility::Visible : EVisibility::Collapsed; })
+						.Text(LOCTEXT("VoicesNote", "Champions in the trials can't hear the eliminated"))
+						.Font(AIBStyle::Body(12)).ColorAndOpacity(AIBStyle::TextFaint())
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight()[VoiceRows]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					QuickRow(LOCTEXT("QCaptions", "Captions"),
@@ -1419,6 +1786,42 @@ TSharedRef<SWidget> SAIBHud::MakePauseMenu()
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
 			[
 				SNew(SAIBReveal).Delay(0.15f)[MenuButton(AIBIcon::Book, LOCTEXT("HowTo", "HOW TO PLAY"), EAIBButtonKind::Secondary, [this]() { bRulesOpen = true; })]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
+			[
+				SNew(SBox)
+				.Visibility_Lambda([this]() { const AAIBGameState* G = GS(); return PC() && PC()->IsHost() && G && G->bMatchInProgress && G->Phase != EAIBPhase::Results ? EVisibility::Visible : EVisibility::Collapsed; })
+				[
+					SNew(SAIBReveal).Delay(0.18f)
+					[
+						SNew(SAIBSlantButton)
+						.Icon(AIBIcon::Restart)
+						.Text_Lambda([this]() { return FPlatformTime::Seconds() < EndMatchConfirmUntil ? LOCTEXT("EndMatchSure", "CLICK AGAIN TO END") : LOCTEXT("EndMatch", "END MATCH"); })
+						.SubText(LOCTEXT("EndMatchSub", "Everyone goes back to the room"))
+						.AccentColor(AIBStyle::Ember())
+						.FontSize(26)
+						.Height(70.f)
+						.MinWidth(470.f)
+						.OnClicked_Lambda([this]()
+						{
+							// Two clicks: ending a match for five people shouldn't be an accident.
+							if (FPlatformTime::Seconds() < EndMatchConfirmUntil)
+							{
+								EndMatchConfirmUntil = 0.0;
+								if (PC())
+								{
+									PC()->ServerReturnToLobby();
+								}
+								TogglePause();
+							}
+							else
+							{
+								EndMatchConfirmUntil = FPlatformTime::Seconds() + 3.0;
+							}
+							return FReply::Handled();
+						})
+					]
+				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f)
 			[

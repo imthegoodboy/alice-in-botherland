@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
 #include "Core/AIBTypes.h"
+#include "Player/AIBPoses.h"
 #include "AIBGameMode.generated.h"
 
 class AAIBGameState;
@@ -47,11 +48,11 @@ public:
 	void RequestSkipCinematic(AAIBPlayerController* PC);
 	void RequestReturnToLobby(AAIBPlayerController* PC);
 	void SubmitNumber(AController* Controller, int32 Number);
+	void SetDraftNumber(AController* Controller, int32 Number);
 	void SubmitGuess(AController* Controller, EAIBSymbol Guess);
 	void SubmitChat(AController* Controller, const FString& Text, int32 ToSlot, EAIBSymbol Claim);
 	void SubmitFinalSelect(AController* Controller, EAIBFinalChoice Choice);
 	void SubmitFinalConfirm(AController* Controller, bool bConfirm);
-	void SetSwitchInteract(AController* Controller, bool bHolding);
 
 	AAIBGameState* GetAIBGameState() const;
 
@@ -95,7 +96,8 @@ protected:
 	void Stage1_AfterResults();
 	void Stage2_Enter();
 	void Stage2_BeginRound();
-	void Stage2_SendSymbolViews();
+	/** Sends each viewer the symbols they may see (only to OnlyFor when given, e.g. after a reconnect). */
+	void Stage2_SendSymbolViews(AAIBPlayerController* OnlyFor = nullptr);
 	void Stage2_Resolve();
 	void Stage2_AfterResults();
 
@@ -110,6 +112,10 @@ protected:
 	void Final_Enter();
 	void Final_BeginChoice();
 	void Final_Tick();
+	/** Selection timer ran out: the pending option, else Become the King (or pass on if the chooser is gone). */
+	void Final_TimeUp();
+	/** The chooser left: the choice passes to the next finalist, or the final ends. */
+	void Final_PassOn();
 	void Final_Commit(EAIBFinalChoice Choice, bool bAuto);
 	void Final_AfterResolve();
 	void Ending_Enter();
@@ -126,7 +132,8 @@ protected:
 	void SetBotWander(const TArray<FVector>& Points, const FBox& Bounds);
 
 	// ---------------- Helpers ----------------
-	void Eliminate(AAIBPlayerState* PS, int32 Stage, bool bForfeit);
+	/** Out of the trials. bJudged: the body stays standing for the judgement scene instead of dropping at once. */
+	void Eliminate(AAIBPlayerState* PS, int32 Stage, bool bForfeit, bool bJudged = false);
 	void Announce(const FText& Title, const FText& Subtitle, const FLinearColor& Color = FLinearColor::White);
 	void Cue(FName CueId);
 	void BroadcastChat(const FAIBChatMessage& Message);
@@ -135,6 +142,40 @@ protected:
 	UAIBWorldSubsystem* WorldSys() const;
 	float Now() const;
 	void SetAllMovementLocked(bool bLocked);
+	/** Adds a moment to the match story. */
+	void LogEvent(EAIBMatchEventKind Kind, int32 Slot, int32 Value = 0);
+	/** Story poses for the moment a phase shows (grief before the judgement, the chooser weighing the choice). */
+	void PlayPhasePoses(EAIBPhase Phase);
+	void PoseSlot(int32 Slot, EAIBPose Pose);
+	void StopAllPoses();
+	/**
+	 * The Guardian's judgement of the champions eliminated this trial (PendingFallen): each says their last words, the
+	 * red beam strikes, they fall, the Guardian speaks. Fills the game state and schedules it; returns the phase length.
+	 */
+	float BeginJudgement(int32 Stage, bool bTrialOver);
+	/** Runs Action after Seconds of (scaled) phase time; cancelled by ClearJudgement. */
+	void Later(float Seconds, TFunction<void()> Action);
+	void ClearJudgement();
+	/** Eliminated this trial and waiting for the judgement scene. */
+	TArray<int32> PendingFallen;
+	/** Last words already spoken this match (each is said once). */
+	TArray<int32> UsedLastWords;
+	TArray<FTimerHandle> JudgementTimers;
+	/** Champions still competing can't hear the eliminated (who see every hidden symbol). */
+	void UpdateVoiceMutes();
+	/** Name mentioned as a whole word in a chat line ("Ann" is not in "Joanna"). */
+	static bool MentionsName(const FString& Text, const FString& Name);
+	/** Turns a departing human's seat into a ghost (reclaimable when bReclaimable) and returns its state. */
+	AAIBPlayerState* MakeGhost(AController* Exiting, AAIBPlayerState* PS, bool bReclaimable);
+	float NextVoiceMuteUpdate = 0.f;
+	/** Gameplay mutes we placed (listener hears nothing from speaker). */
+	struct FAIBVoiceMute
+	{
+		TWeakObjectPtr<APlayerController> Listener;
+		FUniqueNetIdRepl Speaker;
+		bool operator==(const FAIBVoiceMute& Other) const { return Listener == Other.Listener && Speaker == Other.Speaker; }
+	};
+	TArray<FAIBVoiceMute> VoiceMutes;
 
 	// Phase bookkeeping
 	bool bPhaseTimed = false;
@@ -150,6 +191,8 @@ protected:
 
 	// Stage 2 bookkeeping
 	TArray<int32> Stage2Qualified;
+	/** Names in the current Stage 2 tie-break (for the round banner). */
+	FString Stage2TieNames;
 	/** Consecutive tied Stage 1 sudden-death rounds (two players can both pick 0 forever). */
 	int32 Stage1TiedRounds = 0;
 	TArray<int32> Stage2Contenders;
@@ -166,8 +209,8 @@ protected:
 	// Stage 3
 	UPROPERTY()
 	TArray<TObjectPtr<AAIBVehicle>> Vehicles;
-	TArray<float> SwitchHold;
-	TArray<bool> SwitchInteracting;
+	/** Road distance from each finalist's start to the Guardian (for the progress bars). */
+	TArray<float> RaceStartDistance;
 	float RaceStartTime = 0.f;
 	float NextVehicleLog = 0.f;
 
@@ -176,6 +219,8 @@ protected:
 	int32 PerfFrames = 0;
 
 	// Final
+	/** Latest the current choice may run to: the selection timer plus one confirmation window. */
+	float FinalChoiceHardEnd = 0.f;
 	float BotFinalActTime = 0.f;
 	bool bBotSelected = false;
 

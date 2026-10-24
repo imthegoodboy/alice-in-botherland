@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Widgets/SCompoundWidget.h"
-#include "Widgets/SLeafWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Core/AIBTypes.h"
 
@@ -79,6 +78,10 @@ private:
 	TSharedRef<SWidget> MakePauseMenu();
 	TSharedRef<SWidget> MakeLetterbox();
 	TSharedRef<SWidget> MakeSpectatorBar();
+	/** The Guardian's judgement: letterbox, the fallen champion's last words, the flash of the beam. */
+	TSharedRef<SWidget> MakeFallScene();
+	/** End of the epilogue: who the island chose (or that it stays unclaimed). */
+	TSharedRef<SWidget> MakeEpilogueVerdict();
 	/** Narrated story (full screen) and the rules card shown while Alice explains a trial. */
 	TSharedRef<SWidget> MakeStoryLayer();
 	TSharedRef<SWidget> MakeRulesCard();
@@ -104,6 +107,8 @@ private:
 	TWeakObjectPtr<AAIBPlayerController> Owner;
 
 	TSharedPtr<SVerticalBox> ChatList;
+	/** "End match" asks for a second click until this time. */
+	double EndMatchConfirmUntil = 0.0;
 	TSharedPtr<SScrollBox> ChatScroll;
 	TSharedPtr<SEditableTextBox> ChatInput;
 	TSharedPtr<SVerticalBox> ResultsBox;

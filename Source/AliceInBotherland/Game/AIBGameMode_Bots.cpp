@@ -13,7 +13,7 @@ namespace
 {
 	bool IsLiveBot(const AAIBPlayerState* PS)
 	{
-		return PS && PS->bBot && !PS->bDisconnected && PS->IsActiveChampion();
+		return PS && PS->bBot && !PS->bDisconnected && !PS->bGhost && PS->IsActiveChampion();
 	}
 
 	int32 TrustKey(int32 Bot, int32 Other) { return Bot * 8 + Other; }
@@ -106,10 +106,10 @@ void AAIBGameMode::TickBots(float DeltaSeconds)
 int32 AAIBGameMode::BotPickNumber(const AAIBPlayerState* Bot) const
 {
 	const AAIBGameState* GS = GetAIBGameState();
-	if (GS->bStage1SuddenDeath)
+	if (GS->bStage1SuddenDeath && GS->Stage1AtRisk.Contains(Bot->Slot))
 	{
-		// Few players left: the target collapses towards zero, so go low (with some nerves).
-		return FMath::Clamp(FMath::RoundToInt(FMath::Abs(Random.FRandRange(-6.f, 14.f))), 0, 100);
+		// At risk: nerves push the pick a level deeper (lower) than usual.
+		return FMath::Clamp(FMath::RoundToInt(50.f * FMath::Pow(0.8f, float(Random.RandRange(2, 4))) + Random.FRandRange(-5.f, 5.f)), 0, 100);
 	}
 	// Level-k reasoning: level 0 guesses ~50, each level multiplies by 0.8. Temper shifts how deep a bot thinks.
 	float Weights[5] = { 0.12f, 0.28f, 0.3f, 0.2f, 0.1f };

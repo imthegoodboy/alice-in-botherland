@@ -79,8 +79,7 @@ void AAIBGameMode::Stage3_PlaceVehicles(bool bSuddenDeath)
 		return;
 	}
 	Vehicles.SetNum(GS->Finalists.Num());
-	SwitchHold.Init(0.f, GS->Finalists.Num());
-	SwitchInteracting.Init(false, GS->Finalists.Num());
+	RaceStartDistance.Init(0.f, GS->Finalists.Num());
 	for (int32 Index = 0; Index < GS->Finalists.Num(); ++Index)
 	{
 		const int32 Slot = GS->Finalists[Index];
@@ -121,6 +120,7 @@ void AAIBGameMode::Stage3_PlaceVehicles(bool bSuddenDeath)
 		{
 			GS->SwitchProgress[Index] = 0.f;
 		}
+		RaceStartDistance[Index] = FMath::Max(1.f, Course->RemainingDistance(Start.GetLocation()));
 	}
 }
 
@@ -135,21 +135,6 @@ void AAIBGameMode::Stage3_StartRace()
 		}
 	}
 	Cue(TEXT("SFX_Go"));
-}
-
-void AAIBGameMode::SetSwitchInteract(AController* Controller, bool bHolding)
-{
-	const AAIBGameState* GS = GetAIBGameState();
-	const AAIBPlayerState* PS = Controller ? Controller->GetPlayerState<AAIBPlayerState>() : nullptr;
-	if (!PS)
-	{
-		return;
-	}
-	const int32 Index = GS->Finalists.IndexOfByKey(PS->Slot);
-	if (SwitchInteracting.IsValidIndex(Index))
-	{
-		SwitchInteracting[Index] = bHolding;
-	}
 }
 
 void AAIBGameMode::Stage3_Tick(float DeltaSeconds)
@@ -167,6 +152,8 @@ void AAIBGameMode::Stage3_Tick(float DeltaSeconds)
 	{
 		NextVehicleLog = Now() + 2.f;
 	}
+	int32 ClaimIndex = INDEX_NONE;
+	float ClaimDistance = TNumericLimits<float>::Max();
 	for (int32 Index = 0; Index < Vehicles.Num(); ++Index)
 	{
 		AAIBVehicle* Vehicle = Vehicles[Index];
@@ -200,19 +187,23 @@ void AAIBGameMode::Stage3_Tick(float DeltaSeconds)
 			}
 		}
 
-		const bool bInZone = FVector::Dist2D(Location, Switch) < AAIBGuardianSite::SwitchRadius && Vehicle->GetSpeedKmh() < 25.f;
-		const bool bIsBot = PS && PS->bBot && !PS->bDisconnected;
-		const bool bHolding = bInZone && (bIsBot || (SwitchInteracting.IsValidIndex(Index) && SwitchInteracting[Index]));
-		SwitchHold[Index] = bHolding ? SwitchHold[Index] + DeltaSeconds : FMath::Max(0.f, SwitchHold[Index] - DeltaSeconds * 2.f);
-		if (GS->SwitchProgress.IsValidIndex(Index))
+		// Progress along the road for the HUD bars.
+		if (GS->SwitchProgress.IsValidIndex(Index) && GS->RaceDistance.IsValidIndex(Index) && RaceStartDistance.IsValidIndex(Index))
 		{
-			GS->SwitchProgress[Index] = FMath::Clamp(SwitchHold[Index] / AIB::SwitchHold, 0.f, 1.f);
+			GS->SwitchProgress[Index] = FMath::Clamp(1.f - GS->RaceDistance[Index] / RaceStartDistance[Index], 0.f, 1.f);
 		}
-		if (SwitchHold[Index] >= AIB::SwitchHold)
+		// Whoever reaches the Guardian's ring first takes the first choice - no stopping, no button.
+		const float ToSwitch = FVector::Dist2D(Location, Switch);
+		if (ToSwitch < AAIBGuardianSite::SwitchRadius && ToSwitch < ClaimDistance)
 		{
-			Stage3_Claim(Index);
-			return;
+			ClaimIndex = Index;
+			ClaimDistance = ToSwitch;
 		}
+	}
+	// Both in the ring on the same frame: the one deeper in takes it.
+	if (ClaimIndex != INDEX_NONE)
+	{
+		Stage3_Claim(ClaimIndex);
 	}
 }
 
@@ -227,14 +218,24 @@ void AAIBGameMode::Stage3_TimeUp()
 		EnterPhase(EAIBPhase::Stage3Briefing, 6.f);
 		return;
 	}
-	// Still nobody: whoever is closest to the Guardian claims first choice.
-	int32 Best = 0;
-	for (int32 Index = 1; Index < GS->RaceDistance.Num(); ++Index)
+	// Still nobody: whoever (still in the trials) is closest to the Guardian claims first choice.
+	int32 Best = INDEX_NONE;
+	float BestDistance = TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index < GS->Finalists.Num(); ++Index)
 	{
-		if (GS->RaceDistance[Index] < GS->RaceDistance[Best])
+		const AAIBPlayerState* PS = GS->GetPlayerBySlot(GS->Finalists[Index]);
+		const float Distance = GS->RaceDistance.IsValidIndex(Index) ? GS->RaceDistance[Index] : TNumericLimits<float>::Max();
+		if (PS && PS->IsActiveChampion() && (Best == INDEX_NONE || Distance < BestDistance))
 		{
 			Best = Index;
+			BestDistance = Distance;
 		}
+	}
+	if (Best == INDEX_NONE)
+	{
+		Announce(LOCTEXT("NoOneRace", "NO CHAMPION REMAINS"), LOCTEXT("NoOneRaceSub", "The island stays silent."));
+		EnterPhase(EAIBPhase::Results);
+		return;
 	}
 	Stage3_Claim(Best);
 }
@@ -269,6 +270,7 @@ void AAIBGameMode::Stage3_Claim(int32 FinalistIndex)
 	if (PS)
 	{
 		PS->RaceTime = Now() - RaceStartTime;
+		LogEvent(EAIBMatchEventKind::RaceWin, Winner, FMath::RoundToInt(PS->RaceTime));
 	}
 	for (AAIBVehicle* Vehicle : Vehicles)
 	{
@@ -300,8 +302,7 @@ void AAIBGameMode::Stage3_Cleanup()
 		Vehicle->Destroy();
 	}
 	Vehicles.Reset();
-	SwitchHold.Reset();
-	SwitchInteracting.Reset();
+	RaceStartDistance.Reset();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -358,10 +359,15 @@ void AAIBGameMode::Final_BeginChoice()
 	const int32 Slot = GS->GetCurrentChooserSlot();
 	const AAIBPlayerState* PS = GS->GetPlayerBySlot(Slot);
 	BotFinalActTime = Now() + Random.FRandRange(3.f, 9.f);
+	// Changing your mind is allowed, stalling is not: the choice can run one confirmation window past its timer at most.
+	FinalChoiceHardEnd = GS->PhaseEndTime + AIB::FinalConfirm;
 	if (PS)
 	{
+		const bool bAfterSacrifice = GS->Choices.Num() > 0;
 		Announce(FText::Format(LOCTEXT("Chooses", "{0} MUST CHOOSE"), FText::FromString(PS->GetPlayerName().ToUpper())),
-			GS->ChooserIndex == 0 ? LOCTEXT("ChoosesFirst", "First choice, earned at the switch.") : LOCTEXT("ChoosesSecond", "A life was given. Now the choice passes on."),
+			GS->ChooserIndex == 0 ? LOCTEXT("ChoosesFirst", "First choice, earned at the Guardian.")
+				: bAfterSacrifice ? LOCTEXT("ChoosesSecond", "A life was given. Now the choice passes on.")
+				: LOCTEXT("ChoosesAfterLeave", "The first finalist is gone. The choice is yours."),
 			PS->GetCommunityColor());
 	}
 }
@@ -375,8 +381,8 @@ void AAIBGameMode::SubmitFinalSelect(AController* Controller, EAIBFinalChoice Ch
 		return;
 	}
 	GS->PendingOption = Choice;
-	GS->ConfirmEndTime = Now() + AIB::FinalConfirm;
-	// The confirmation window may run past the selection timer.
+	GS->ConfirmEndTime = FMath::Min(Now() + AIB::FinalConfirm, FMath::Max(FinalChoiceHardEnd, Now() + 1.f));
+	// The confirmation window may run past the selection timer (once: see FinalChoiceHardEnd).
 	GS->PhaseEndTime = FMath::Max(GS->PhaseEndTime, GS->ConfirmEndTime + 0.2f);
 	GS->ForceNetUpdate();
 }
@@ -413,7 +419,13 @@ void AAIBGameMode::Final_Tick()
 	}
 
 	AAIBPlayerState* PS = GS->GetPlayerBySlot(GS->GetCurrentChooserSlot());
-	if (!PS || !PS->bBot || PS->bDisconnected || Now() < BotFinalActTime)
+	if (!PS || !PS->IsActiveChampion())
+	{
+		// The chooser forfeited (left and never came back).
+		Final_PassOn();
+		return;
+	}
+	if (!PS->bBot || PS->bDisconnected || PS->bGhost || Now() < BotFinalActTime)
 	{
 		return;
 	}
@@ -430,6 +442,53 @@ void AAIBGameMode::Final_Tick()
 	{
 		SubmitFinalConfirm(Bot, true);
 	}
+}
+
+void AAIBGameMode::Final_TimeUp()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	const AAIBPlayerState* PS = GS->GetPlayerBySlot(GS->GetCurrentChooserSlot());
+	if (!PS || !PS->IsActiveChampion() || PS->bDisconnected)
+	{
+		// Nobody there to crown: a champion who dropped out doesn't win by default.
+		if (PS && PS->IsActiveChampion())
+		{
+			Eliminate(GS->GetPlayerBySlot(PS->Slot), 0, true);
+		}
+		Final_PassOn();
+		return;
+	}
+	// Picked but didn't confirm in time: that pick stands. Picked nothing: Become the King (the rule shown before the match).
+	Final_Commit(GS->PendingOption != EAIBFinalChoice::None ? GS->PendingOption : EAIBFinalChoice::King, true);
+}
+
+void AAIBGameMode::Final_PassOn()
+{
+	AAIBGameState* GS = GetAIBGameState();
+	const AAIBPlayerState* Gone = GS->GetPlayerBySlot(GS->GetCurrentChooserSlot());
+	GS->PendingOption = EAIBFinalChoice::None;
+	GS->ConfirmEndTime = 0.f;
+	while (GS->ChooserIndex + 1 < GS->ChoiceOrder.Num())
+	{
+		GS->ChooserIndex++;
+		const AAIBPlayerState* Next = GS->GetPlayerBySlot(GS->GetCurrentChooserSlot());
+		if (Next && Next->IsActiveChampion())
+		{
+			SystemChat(FText::Format(LOCTEXT("PassOnChat", "{0} left the Guardian. The choice passes to {1}."),
+				FText::FromString(Gone ? Gone->GetPlayerName() : FString()), FText::FromString(Next->GetPlayerName())));
+			EnterPhase(EAIBPhase::FinalChoice);
+			return;
+		}
+	}
+	if (GS->Choices.Num() > 0)
+	{
+		// Someone already gave their life: that ending stands.
+		GS->Ending = GS->Choices.Num() >= 2 ? EAIBEnding::DoubleSacrifice : EAIBEnding::SoloSacrifice;
+		FadeToPhase(EAIBPhase::EndingCinematic);
+		return;
+	}
+	Announce(LOCTEXT("NoChooser", "NO CHAMPION REMAINS"), LOCTEXT("NoChooserSub", "The Guardian waits for someone who will choose."));
+	EnterPhase(EAIBPhase::Results);
 }
 
 void AAIBGameMode::Final_Commit(EAIBFinalChoice Choice, bool bAuto)
@@ -453,11 +512,13 @@ void AAIBGameMode::Final_Commit(EAIBFinalChoice Choice, bool bAuto)
 
 	AAIBCharacter* Character = GetCharacterForSlot(Slot);
 	const FText Name = FText::FromString(PS->GetPlayerName().ToUpper());
+	// A sacrifice before this choice (Choices already holds this one).
+	const bool bAfterSacrifice = GS->Choices.Num() > 1;
 	if (Choice == EAIBFinalChoice::King)
 	{
 		PS->Status = EAIBPlayerStatus::Champion;
 		GS->ChampionSlot = Slot;
-		if (GS->ChooserIndex == 0)
+		if (!bAfterSacrifice)
 		{
 			GS->Ending = GS->ChoiceOrder.Num() == 1 ? EAIBEnding::SoloKing : EAIBEnding::KingFirst;
 		}
@@ -468,11 +529,25 @@ void AAIBGameMode::Final_Commit(EAIBFinalChoice Choice, bool bAuto)
 		if (Character)
 		{
 			Character->MulticastCrown();
+			Character->PlayPose(EAIBPose::Crowned);
 		}
+		LogEvent(EAIBMatchEventKind::Crowned, Slot);
 		Cue(TEXT("SFX_Crown"));
-		Announce(FText::Format(LOCTEXT("King", "{0} HAS CLAIMED THE ISLAND"), Name),
-			bAuto ? LOCTEXT("KingAuto", "Time ran out. The Guardian crowned them by default.") : FText::Format(LOCTEXT("KingSub", "{0} will not follow them ashore."), PS->GetCommunityName()),
-			FLinearColor(1.f, 0.78f, 0.3f));
+		FText KingSub;
+		if (bAuto)
+		{
+			KingSub = LOCTEXT("KingAuto", "Time ran out. The Guardian crowned them by default.");
+		}
+		else if (bAfterSacrifice)
+		{
+			// Second chooser: their people take the island, the first finalist's people escape by sea.
+			KingSub = FText::Format(LOCTEXT("KingSecondSub", "{0} claims the island's riches. The saved escape by sea."), PS->GetCommunityName());
+		}
+		else
+		{
+			KingSub = FText::Format(LOCTEXT("KingSub", "{0} will not follow them ashore."), PS->GetCommunityName());
+		}
+		Announce(FText::Format(LOCTEXT("King", "{0} HAS CLAIMED THE ISLAND"), Name), KingSub, FLinearColor(1.f, 0.78f, 0.3f));
 	}
 	else
 	{
@@ -480,7 +555,9 @@ void AAIBGameMode::Final_Commit(EAIBFinalChoice Choice, bool bAuto)
 		if (Character)
 		{
 			Character->MulticastSacrifice();
+			Character->PlayPose(EAIBPose::Farewell);
 		}
+		LogEvent(EAIBMatchEventKind::Sacrificed, Slot);
 		Cue(TEXT("SFX_Choir"));
 		Announce(FText::Format(LOCTEXT("Sacrifice", "{0} GAVE THEIR LIFE"), Name),
 			FText::Format(LOCTEXT("SacrificeSub", "{0} is carried to safety."), PS->GetCommunityName()), FLinearColor(0.8f, 0.9f, 1.f));
@@ -570,7 +647,7 @@ FAIBMatchRecord AAIBGameMode::BuildMatchRecord() const
 		Player.Community = PS->Slot;
 		Player.Status = PS->Status;
 		Player.EliminatedInStage = PS->EliminatedInStage;
-		Player.bBot = PS->bBot && !PS->bDisconnected;
+		Player.bBot = PS->bBot && !PS->bGhost;
 		Record.Players.Add(Player);
 	}
 	return Record;

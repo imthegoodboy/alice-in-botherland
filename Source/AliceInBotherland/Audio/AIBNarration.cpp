@@ -108,9 +108,37 @@ namespace AIBNarration
 			{ TEXT("NAR_Final_Rule3"), TEXT("T4_Choice"), T4 },
 			{ TEXT("NAR_Final_Rule4"), TEXT("T4_Choice"), T4 } });
 
+		// The epilogue: Doctor Varne, the island he built, and what the trials were really testing.
+		static const FText Truth = LOCTEXT("CardTruth", "THE TRUTH OF THE ISLAND");
+		static const FText Scientist = LOCTEXT("CardScientist", "THE MAN WHO SAW IT COMING");
+		static const FText Backup = LOCTEXT("CardBackup", "A BACKUP FOR HUMANITY");
+		static const FText Keeper = LOCTEXT("CardKeeper", "THE KEEPER");
+		static const FText Tests = LOCTEXT("CardTests", "MIND, TRUST AND HEART");
+		static const FText Chosen = LOCTEXT("CardChosen", "THE ISLAND HAS CHOSEN");
+		static const FText Dawn = LOCTEXT("CardDawn", "A NEW DAWN");
+		auto Epilogue = [&](FName Closing, FName Image, const FText& Card)
+		{
+			return Build({
+				{ TEXT("NAR_Epi_01"), TEXT("S3_Island"), Truth },
+				{ TEXT("NAR_Epi_02"), TEXT("E_Scientist"), Scientist },
+				{ TEXT("NAR_Epi_03"), TEXT("E_Warning"), Scientist },
+				{ TEXT("NAR_Epi_04"), TEXT("E_Ark"), Backup },
+				{ TEXT("NAR_Epi_05"), TEXT("E_Keeper"), Keeper },
+				{ TEXT("NAR_Epi_06"), TEXT("T1_Numbers"), Tests },
+				{ TEXT("NAR_Epi_07"), TEXT("T2_Symbols"), Tests },
+				{ TEXT("NAR_Epi_08"), TEXT("T4_Choice"), Tests },
+				{ Closing, Image, Card } });
+		};
+		static const FSequence EpilogueCrown = Epilogue(TEXT("NAR_Epi_Crown"), TEXT("E_Crown"), Chosen);
+		static const FSequence EpilogueGift = Epilogue(TEXT("NAR_Epi_Gift"), TEXT("E_Dawn"), Chosen);
+		static const FSequence EpilogueSaved = Epilogue(TEXT("NAR_Epi_Saved"), TEXT("E_Dawn"), Dawn);
+
 		switch (Which)
 		{
 		case EAIBNarration::Story: return Story;
+		case EAIBNarration::EpilogueCrown: return EpilogueCrown;
+		case EAIBNarration::EpilogueGift: return EpilogueGift;
+		case EAIBNarration::EpilogueSaved: return EpilogueSaved;
 		case EAIBNarration::Island: return IslandWelcome;
 		case EAIBNarration::Stage1: return Stage1;
 		case EAIBNarration::Stage2: return Stage2;
@@ -144,10 +172,28 @@ namespace AIBNarration
 		return Get(Which).Beats.ContainsByPredicate([Line](const FBeat& Beat) { return Beat.Line == Line; });
 	}
 
-	EAIBNarration ForPhase(EAIBPhase Phase)
+	EAIBNarration EpilogueFor(EAIBEnding Ending)
+	{
+		switch (Ending)
+		{
+		case EAIBEnding::KingFirst:
+		case EAIBEnding::SoloKing:
+			return EAIBNarration::EpilogueCrown;
+		case EAIBEnding::SacrificeThenKing:
+			return EAIBNarration::EpilogueGift;
+		case EAIBEnding::DoubleSacrifice:
+		case EAIBEnding::SoloSacrifice:
+			return EAIBNarration::EpilogueSaved;
+		default:
+			return EAIBNarration::None;
+		}
+	}
+
+	EAIBNarration ForPhase(EAIBPhase Phase, EAIBEnding Ending)
 	{
 		switch (Phase)
 		{
+		case EAIBPhase::Epilogue: return EpilogueFor(Ending);
 		case EAIBPhase::StoryIntro: return EAIBNarration::Story;
 		case EAIBPhase::IslandExplore: return EAIBNarration::Island;
 		case EAIBPhase::Stage1Briefing: return EAIBNarration::Stage1;

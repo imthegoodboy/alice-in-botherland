@@ -13,6 +13,8 @@
 #include "UI/AIBStyle.h"
 #include "OnlineSubsystemUtils.h"
 #include "Interfaces/VoiceInterface.h"
+#include "VoipListenerSynthComponent.h"
+#include "UObject/UObjectIterator.h"
 #include "World/AIBLoreStones.h"
 #include "Online/AIBSessionSubsystem.h"
 #include "World/AIBWorldSubsystem.h"
@@ -151,6 +153,7 @@ void AAIBPlayerController::BuildInput()
 	IA_SpectateNext = MakeAction(TEXT("IA_SpectateNext"), EInputActionValueType::Boolean);
 	IA_SpectatePrev = MakeAction(TEXT("IA_SpectatePrev"), EInputActionValueType::Boolean);
 	IA_Talk = MakeAction(TEXT("IA_Talk"), EInputActionValueType::Boolean);
+	IA_MicToggle = MakeAction(TEXT("IA_MicToggle"), EInputActionValueType::Boolean);
 
 	auto Negate = [this]() { return NewObject<UInputModifierNegate>(Mapping); };
 	auto SwizzleYX = [this]()
@@ -208,6 +211,7 @@ void AAIBPlayerController::BuildInput()
 	Mapping->MapKey(IA_SpectatePrev, EKeys::Gamepad_LeftShoulder);
 	Mapping->MapKey(IA_Talk, EKeys::V);
 	Mapping->MapKey(IA_Talk, EKeys::Gamepad_DPad_Up);
+	Mapping->MapKey(IA_MicToggle, EKeys::M);
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
@@ -252,6 +256,7 @@ void AAIBPlayerController::SetupInputComponent()
 	Input->BindAction(IA_SpectatePrev, ETriggerEvent::Started, this, &AAIBPlayerController::OnSpectatePrev);
 	Input->BindAction(IA_Talk, ETriggerEvent::Started, this, &AAIBPlayerController::OnTalk);
 	Input->BindAction(IA_Talk, ETriggerEvent::Completed, this, &AAIBPlayerController::OnTalk);
+	Input->BindAction(IA_MicToggle, ETriggerEvent::Started, this, &AAIBPlayerController::OnMicToggle);
 }
 
 bool AAIBPlayerController::IsMovementAllowed() const
@@ -308,7 +313,7 @@ void AAIBPlayerController::OnLook(const FInputActionValue& Value)
 void AAIBPlayerController::OnJumpStarted()
 {
 	const AAIBGameState* GS = GetAIBGameState();
-	if (GS && (GS->Phase == EAIBPhase::ArrivalCinematic || GS->Phase == EAIBPhase::StoryIntro))
+	if (GS && AIB::IsSkippablePhase(GS->Phase))
 	{
 		RequestSkip();
 		return;
@@ -343,6 +348,73 @@ void AAIBPlayerController::OnTalk(const FInputActionValue& Value)
 	bTalkHeld = Value.Get<bool>();
 }
 
+void AAIBPlayerController::OnMicToggle()
+{
+	if (Hud.IsValid() && Hud->BlocksGameInput())
+	{
+		return;
+	}
+	ToggleMicMute();
+}
+
+void AAIBPlayerController::ToggleMicMute()
+{
+	if (MicMode != 0)
+	{
+		MicModeBeforeMute = MicMode;
+		SetMicMode(0);
+	}
+	else
+	{
+		SetMicMode(MicModeBeforeMute == 0 ? 1 : MicModeBeforeMute);
+	}
+}
+
+void AAIBPlayerController::SetMicMode(int32 NewMode)
+{
+	UAIBGameInstance* GI = GetGameInstance<UAIBGameInstance>();
+	if (!GI)
+	{
+		return;
+	}
+	FAIBSettings S = GI->GetSettings();
+	S.MicMode = FMath::Clamp(NewMode, 0, 2);
+	GI->SetSettings(S);
+	MicMode = S.MicMode;
+	const FText Message = MicMode == 0 ? LOCTEXT("MicToastOff", "Microphone OFF  (M to turn it on)")
+		: MicMode == 2 ? LOCTEXT("MicToastOpen", "Microphone ON - open mic")
+		: LOCTEXT("MicToastPtt", "Microphone ON - hold V to talk");
+	Toasts.Add({ Message, (float)GetWorld()->GetTimeSeconds() });
+	if (UAIBAudioSubsystem* Audio = GetGameInstance()->GetSubsystem<UAIBAudioSubsystem>())
+	{
+		Audio->PlayCue(TEXT("SFX_UI_Click"));
+	}
+}
+
+bool AAIBPlayerController::IsMutedLocally(const AAIBPlayerState* PS) const
+{
+	return PS && PS->GetUniqueId().IsValid() && LocallyMuted.Contains(PS->GetUniqueId());
+}
+
+void AAIBPlayerController::ToggleMuteLocally(const AAIBPlayerState* PS)
+{
+	if (!PS || PS->bBot || !PS->GetUniqueId().IsValid() || PS == GetAIBPlayerState())
+	{
+		return;
+	}
+	const FUniqueNetIdRepl& Id = PS->GetUniqueId();
+	if (LocallyMuted.Contains(Id))
+	{
+		LocallyMuted.Remove(Id);
+		ServerUnmutePlayer(Id);
+	}
+	else
+	{
+		LocallyMuted.Add(Id);
+		ServerMutePlayer(Id);
+	}
+}
+
 int32 AAIBPlayerController::GetLoreFound() const
 {
 	const AAIBPlayerState* PS = GetAIBPlayerState();
@@ -368,17 +440,12 @@ void AAIBPlayerController::OnInteract(const FInputActionValue& Value)
 		NearLore = INDEX_NONE;
 		return;
 	}
-	if (bHeld != bHoldingInteract)
-	{
-		bHoldingInteract = bHeld;
-		ServerSetSwitchInteract(bHeld);
-	}
 }
 
 void AAIBPlayerController::OnChat()
 {
 	const AAIBGameState* GS = GetAIBGameState();
-	if (GS && (GS->Phase == EAIBPhase::ArrivalCinematic || GS->Phase == EAIBPhase::StoryIntro))
+	if (GS && AIB::IsSkippablePhase(GS->Phase))
 	{
 		RequestSkip();
 		return;
@@ -493,6 +560,11 @@ void AAIBPlayerController::TogglePauseMenu()
 void AAIBPlayerController::LeaveMatch()
 {
 	UE_LOG(LogAIB, Log, TEXT("Leaving the match for the main menu (phase %s)"), GetAIBGameState() ? *UEnum::GetValueAsString(GetAIBGameState()->Phase) : TEXT("?"));
+	if (GetNetMode() == NM_Client)
+	{
+		// Tell the host this was on purpose (no seat held, a quitter forfeits at once).
+		ServerLeaving();
+	}
 	if (UAIBSessionSubsystem* Sessions = GetGameInstance()->GetSubsystem<UAIBSessionSubsystem>())
 	{
 		Sessions->LeaveToMenu();
@@ -535,6 +607,7 @@ void AAIBPlayerController::PlayerTick(float DeltaTime)
 	UpdateCamera(DeltaTime);
 	UpdateNarration();
 	UpdateVoiceChat();
+	UpdateDraftNumber();
 	UpdateLore();
 	UpdateSymbols();
 	UpdateCountdownSounds();
@@ -593,6 +666,54 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 	AAIBHotelArena* Hotel = WorldSys->GetHotel();
 	AAIBGuardianSite* Guardian = WorldSys->GetGuardian();
 
+	// The Guardian's judgement: close on the champion speaking their last words, then low and wide to watch the beam come down.
+	auto FallShot = [&](FTransform& OutShot, float& OutFOV) -> bool
+	{
+		if (GS->Fallen.Num() == 0)
+		{
+			return false;
+		}
+		int32 Speaker = 0;
+		for (int32 Index = 0; Index < GS->Fallen.Num(); ++Index)
+		{
+			if (Elapsed >= GS->Fallen[Index].SpeakAt - 0.4f)
+			{
+				Speaker = Index;
+			}
+		}
+		const AAIBCharacter* Target = nullptr;
+		for (TActorIterator<AAIBCharacter> It(GetWorld()); It; ++It)
+		{
+			const AAIBPlayerState* PS = It->GetChampionState();
+			if (PS && PS->Slot == GS->Fallen[Speaker].Slot)
+			{
+				Target = *It;
+				break;
+			}
+		}
+		if (!Target)
+		{
+			return false;
+		}
+		const FVector Base = Target->GetActorLocation();
+		const FVector Fwd = Target->GetActorForwardVector().GetSafeNormal2D();
+		const FVector Side = FVector::CrossProduct(FVector::UpVector, Fwd);
+		const FVector Head = Base + FVector(0.f, 0.f, 58.f);
+		const float Push = FMath::Clamp((Elapsed - GS->Fallen[Speaker].SpeakAt) / 5.f, 0.f, 1.f);
+		// Slightly below eye level, so the bowed face is seen rather than the top of the head.
+		const FVector CloseEye = Head + Fwd * FMath::Lerp(320.f, 250.f, Push) + Side * 60.f - FVector(0.f, 0.f, 48.f);
+		const FVector CloseLook = Head - FVector(0.f, 0.f, 6.f);
+		const FTransform Close(FRotationMatrix::MakeFromX(CloseLook - CloseEye).Rotator(), CloseEye);
+		// Three-quarter front and low: the whole champion (and where they fall) with the sky above them.
+		const FVector WideEye = Base + Side * 300.f + Fwd * 280.f + FVector(0.f, 0.f, 20.f);
+		const FVector WideLook = Base + FVector(0.f, 0.f, 60.f);
+		const FTransform Wide(FRotationMatrix::MakeFromX(WideLook - WideEye).Rotator(), WideEye);
+		const float ToWide = FMath::SmoothStep(GS->FallStrikeAt - 2.f, GS->FallStrikeAt - 0.9f, Elapsed);
+		OutShot.Blend(Close, Wide, ToWide);
+		OutFOV = FMath::Lerp(36.f, 72.f, ToWide);
+		return true;
+	};
+
 	auto SpectatePawn = [&]() -> AActor*
 	{
 		// Move on when the watched champion is gone, hidden, or has since been eliminated.
@@ -633,7 +754,11 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 		Follow = (MyPawn && !bSpectating) ? MyPawn : SpectatePawn();
 		break;
 	case EAIBPhase::Stage1Elimination:
-		if (Numbers)
+		if (FallShot(Shot, FOV))
+		{
+			bCine = true;
+		}
+		else if (Numbers)
 		{
 			bCine = true;
 			Shot = Numbers->GetOverviewCamera(Time);
@@ -660,7 +785,11 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 		break;
 	case EAIBPhase::Stage2Results:
 	case EAIBPhase::Stage2Elimination:
-		if (Hotel)
+		if (GS->Phase == EAIBPhase::Stage2Elimination && FallShot(Shot, FOV))
+		{
+			bCine = true;
+		}
+		else if (Hotel)
 		{
 			bCine = true;
 			Shot = Hotel->GetOverviewCamera(Time);
@@ -701,6 +830,7 @@ void AAIBPlayerController::UpdateCamera(float DeltaTime)
 		}
 		break;
 	case EAIBPhase::EndingCinematic:
+	case EAIBPhase::Epilogue:
 		if (Guardian)
 		{
 			bCine = true;
@@ -828,6 +958,7 @@ void AAIBPlayerController::ApplySettings()
 	bInvertY = S.bInvertY;
 	FieldOfView = FMath::Clamp(S.FieldOfView, 60.f, 110.f);
 	MicMode = S.MicMode;
+	VoiceChatVolume = FMath::Clamp(S.VoiceChatVolume, 0.f, 2.f);
 #if !UE_BUILD_SHIPPING
 	// Development: -AIBMic=2 forces an open microphone (voice chat testing).
 	FParse::Value(FCommandLine::Get(), TEXT("AIBMic="), MicMode);
@@ -864,7 +995,8 @@ void AAIBPlayerController::UpdateNarration()
 		}
 		// Load the coming narration (voice and pictures) before it is needed: a stall mid-story would put Alice out
 		// of step with her captions. The story is loaded while the room counts down.
-		const EAIBNarration Coming = GS->Phase == EAIBPhase::LobbyCountdown ? EAIBNarration::Story : AIBNarration::ForPhase(GS->Phase);
+		const EAIBNarration Coming = GS->Phase == EAIBPhase::LobbyCountdown ? EAIBNarration::Story
+			: GS->Phase == EAIBPhase::EndingCinematic ? AIBNarration::EpilogueFor(GS->Ending) : AIBNarration::ForPhase(GS->Phase, GS->Ending);
 		TArray<FName> ComingLines;
 		for (const AIBNarration::FBeat& Beat : AIBNarration::Get(Coming).Beats)
 		{
@@ -879,8 +1011,9 @@ void AAIBPlayerController::UpdateNarration()
 		bLobbyWelcomed = true;
 		Audio->PlayVoice(TEXT("NAR_Lobby_Welcome"));
 	}
-	const EAIBNarration Which = AIBNarration::ForPhase(GS->Phase);
-	if (Which == EAIBNarration::None)
+	const EAIBNarration Which = AIBNarration::ForPhase(GS->Phase, GS->Ending);
+	// The sudden-death race gets a short countdown banner, not the whole briefing again.
+	if (Which == EAIBNarration::None || (GS->Phase == EAIBPhase::Stage3Briefing && GS->bRaceSuddenDeath))
 	{
 		return;
 	}
@@ -923,6 +1056,43 @@ void AAIBPlayerController::UpdateVoiceChat()
 		bSpeaking = bWant;
 		ToggleSpeaking(bWant);
 		ServerSetTalking(bWant);
+	}
+	// Other champions' voices play through VoIP synth components that come and go with the talkers.
+	const float Now = GetWorld()->GetRealTimeSeconds();
+	if (Now >= NextVoipVolumeTime)
+	{
+		NextVoipVolumeTime = Now + 0.5f;
+		for (TObjectIterator<UVoipListenerSynthComponent> It; It; ++It)
+		{
+			if (It->GetWorld() == GetWorld())
+			{
+				It->SetVolumeMultiplier(VoiceChatVolume);
+			}
+		}
+	}
+}
+
+void AAIBPlayerController::UpdateDraftNumber()
+{
+	const AAIBGameState* GS = GetAIBGameState();
+	const AAIBPlayerState* PS = GetAIBPlayerState();
+	if (!GS || !PS || GS->Phase != EAIBPhase::Stage1Selection || PS->bSubmitted)
+	{
+		return;
+	}
+	if (DraftPhaseSerial != GS->PhaseSerial)
+	{
+		// Only a number the champion actually dialled counts, not the dial's resting value.
+		DraftPhaseSerial = GS->PhaseSerial;
+		DraftBaseline = DraftNumber;
+		DraftSent = DraftNumber;
+	}
+	const float Now = GetWorld()->GetRealTimeSeconds();
+	if (DraftNumber != DraftSent && Now >= NextDraftSendTime)
+	{
+		DraftSent = DraftNumber;
+		NextDraftSendTime = Now + 0.25f;
+		ServerSetDraftNumber(DraftNumber);
 	}
 }
 
@@ -969,6 +1139,8 @@ void AAIBPlayerController::ServerStartMatch_Implementation() { if (AAIBGameMode*
 void AAIBPlayerController::ServerSetAITestMode_Implementation(bool bOn) { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestSetAITestMode(this, bOn); }
 void AAIBPlayerController::ServerDiscoverLore_Implementation(int32 Index) { if (AAIBGameMode* GM = AIBMode(this)) GM->DiscoverLore(this, Index); }
 void AAIBPlayerController::ServerSetTalking_Implementation(bool bTalking) { if (AAIBGameMode* GM = AIBMode(this)) GM->SetTalking(this, bTalking); }
+void AAIBPlayerController::ServerLeaving_Implementation() { bLeftForGood = true; }
+void AAIBPlayerController::ServerSetDraftNumber_Implementation(int32 Number) { if (AAIBGameMode* GM = AIBMode(this)) GM->SetDraftNumber(this, Number); }
 void AAIBPlayerController::ServerSkipCinematic_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestSkipCinematic(this); }
 void AAIBPlayerController::ServerReturnToLobby_Implementation() { if (AAIBGameMode* GM = AIBMode(this)) GM->RequestReturnToLobby(this); }
 void AAIBPlayerController::ServerSubmitNumber_Implementation(int32 Number) { if (AAIBGameMode* GM = AIBMode(this)) GM->SubmitNumber(this, Number); }
@@ -976,10 +1148,17 @@ void AAIBPlayerController::ServerSubmitGuess_Implementation(EAIBSymbol Guess) { 
 void AAIBPlayerController::ServerSendChat_Implementation(const FString& Text, int32 ToSlot, EAIBSymbol Claim) { if (AAIBGameMode* GM = AIBMode(this)) GM->SubmitChat(this, Text, ToSlot, Claim); }
 void AAIBPlayerController::ServerFinalSelect_Implementation(EAIBFinalChoice Choice) { if (AAIBGameMode* GM = AIBMode(this)) GM->SubmitFinalSelect(this, Choice); }
 void AAIBPlayerController::ServerFinalConfirm_Implementation(bool bConfirm) { if (AAIBGameMode* GM = AIBMode(this)) GM->SubmitFinalConfirm(this, bConfirm); }
-void AAIBPlayerController::ServerSetSwitchInteract_Implementation(bool bHolding) { if (AAIBGameMode* GM = AIBMode(this)) GM->SetSwitchInteract(this, bHolding); }
 
 void AAIBPlayerController::ClientReceiveChat_Implementation(const FAIBChatMessage& Message)
 {
+	if (!Message.bSystem && Message.FromSlot != INDEX_NONE)
+	{
+		const AAIBGameState* GS = GetAIBGameState();
+		if (GS && IsMutedLocally(GS->GetPlayerBySlot(Message.FromSlot)))
+		{
+			return;
+		}
+	}
 	ChatLog.Add(Message);
 	if (ChatLog.Num() > 80)
 	{

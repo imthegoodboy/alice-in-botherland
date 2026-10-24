@@ -134,11 +134,12 @@ namespace AIB
 		case EAIBPhase::Stage3Briefing: return LOCTEXT("PhS3Brief", "Stage 3 - Race to the Guardian");
 		case EAIBPhase::Stage3Countdown: return LOCTEXT("PhS3Count", "Get ready");
 		case EAIBPhase::Stage3Race: return LOCTEXT("PhS3Race", "Reach the Guardian");
-		case EAIBPhase::Stage3Finish: return LOCTEXT("PhS3Finish", "The switch is claimed");
+		case EAIBPhase::Stage3Finish: return LOCTEXT("PhS3Finish", "The Guardian is reached");
 		case EAIBPhase::FinalBriefing: return LOCTEXT("PhFinalBrief", "The Guardian's Choice");
 		case EAIBPhase::FinalChoice: return LOCTEXT("PhFinalChoice", "Make your choice");
 		case EAIBPhase::FinalResolve: return LOCTEXT("PhFinalResolve", "The choice is made");
 		case EAIBPhase::EndingCinematic: return LOCTEXT("PhEnding", "Ending");
+		case EAIBPhase::Epilogue: return LOCTEXT("PhEpilogue", "The truth of the island");
 		case EAIBPhase::Results: return LOCTEXT("PhResults", "Results");
 		default: return FText::GetEmpty();
 		}
@@ -154,6 +155,7 @@ namespace AIB
 			return EAIBSceneZone::Lobby;
 		case EAIBPhase::StoryIntro:
 		case EAIBPhase::ArrivalCinematic:
+		case EAIBPhase::Epilogue:
 			return EAIBSceneZone::Sea;
 		case EAIBPhase::IslandExplore:
 			return EAIBSceneZone::Island;
@@ -191,6 +193,11 @@ namespace AIB
 		return Phase == EAIBPhase::Stage1Selection || Phase == EAIBPhase::Stage2Guess || Phase == EAIBPhase::FinalChoice;
 	}
 
+	bool IsSkippablePhase(EAIBPhase Phase)
+	{
+		return Phase == EAIBPhase::StoryIntro || Phase == EAIBPhase::ArrivalCinematic || Phase == EAIBPhase::Epilogue;
+	}
+
 	FText EndingTitle(EAIBEnding Ending)
 	{
 		switch (Ending)
@@ -224,6 +231,7 @@ namespace AIB
 		}
 		return FString::Printf(TEXT("Nomad %d"), Stream.RandRange(10, 99));
 	}
+
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -26,6 +26,8 @@ struct FAIBSettings
 	UPROPERTY() float FieldOfView = 80.f;
 	/** Voice chat: 0 = microphone off, 1 = push to talk (V), 2 = open microphone. */
 	UPROPERTY() int32 MicMode = 1;
+	/** Other champions' voices (voice chat playback volume). */
+	UPROPERTY() float VoiceChatVolume = 1.f;
 	/** 0 Low .. 3 Epic, -1 = auto (benchmark). */
 	UPROPERTY() int32 Quality = -1;
 	UPROPERTY() bool bFullscreen = true;

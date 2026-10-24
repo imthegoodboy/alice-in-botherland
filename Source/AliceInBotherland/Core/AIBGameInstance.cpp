@@ -45,7 +45,7 @@ void UAIBGameInstance::Init()
 void UAIBGameInstance::OnStart()
 {
 	Super::OnStart();
-	UE_LOG(LogAIB, Log, TEXT("Alice in Botherland: The Last Island v1.2.0 build 3"));
+	UE_LOG(LogAIB, Log, TEXT("Alice in Botherland: The Last Island v1.3.0 build 1"));
 
 	// Settings are applied here rather than in Init: scalability changes are ignored until the engine is initialized.
 	// First launch on this PC (or new defaults): let the engine pick sensible graphics settings for the hardware.

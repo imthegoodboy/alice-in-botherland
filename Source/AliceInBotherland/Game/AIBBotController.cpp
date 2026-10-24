@@ -44,7 +44,7 @@ void AAIBBotController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	// Ghosts hold a disconnected human's seat: they never act on their behalf.
 	const AAIBPlayerState* PS = GetPlayerState<AAIBPlayerState>();
-	if (!PS || PS->bDisconnected)
+	if (!PS || PS->bDisconnected || PS->bGhost)
 	{
 		return;
 	}
@@ -114,14 +114,6 @@ void AAIBBotController::TickDrive(AAIBVehicle* Vehicle, float DeltaSeconds)
 	const FVector Switch = Guardian->GetSwitchLocation();
 	const float SpeedKmh = Vehicle->GetSpeedKmh();
 
-	// Arrived: stop on the switch and hold.
-	if (FVector::Dist2D(Location, Switch) < AAIBGuardianSite::SwitchRadius * 0.6f)
-	{
-		Vehicle->ApplyThrottle(-0.6f * FMath::Clamp(SpeedKmh / 20.f, 0.f, 1.f));
-		Vehicle->ApplySteering(0.f);
-		Vehicle->ApplyHandbrake(SpeedKmh < 8.f);
-		return;
-	}
 	Vehicle->ApplyHandbrake(false);
 
 	// Recover from being stuck: reverse with opposite lock.
@@ -158,11 +150,6 @@ void AAIBBotController::TickDrive(AAIBVehicle* Vehicle, float DeltaSeconds)
 	if (SpeedKmh > MaxSpeed)
 	{
 		Throttle = 0.2f;
-	}
-	const float DistToSwitch = FVector::Dist2D(Location, Switch);
-	if (DistToSwitch < 3000.f && SpeedKmh > 35.f)
-	{
-		Throttle = -0.4f; // brake into the switch area
 	}
 	// Small wobble so bots aren't laser-perfect.
 	const float Wobble = FMath::Sin(GetWorld()->GetTimeSeconds() * 0.9f + Skill * 10.f) * (1.f - Skill) * 0.15f;

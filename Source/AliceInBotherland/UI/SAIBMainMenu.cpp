@@ -1057,8 +1057,8 @@ TSharedRef<SWidget> SAIBMainMenu::MakeHowTo()
 {
 	const FText Controls = LOCTEXT("Controls",
 		"ON FOOT  -  WASD move, Mouse look, Shift sprint, Space jump, E read a marker stone\n"
-		"DRIVING  -  W/S throttle and brake, A/D steer, Space handbrake, R reset, hold E on the switch\n"
-		"ALWAYS  -  hold V to talk (voice chat), Enter text chat, Tab scoreboard, Esc menu.  Gamepads are supported too.");
+		"DRIVING  -  W/S throttle and brake, A/D steer, Space handbrake, R reset, drive into the Guardian's ring to claim it\n"
+		"ALWAYS  -  hold V to talk, M mic on/off, Enter text chat, Tab scoreboard, Esc menu (mute players there).  Gamepads are supported too.");
 	TSharedRef<SWidget> Body = SNew(SBox)
 		.MaxDesiredHeight(600.f)
 		[
@@ -1099,6 +1099,7 @@ TSharedRef<SWidget> SAIBMainMenu::MakeHall()
 				return P ? FText::Format(LOCTEXT("Stats", "MATCHES {0}   -   CROWNS {1}   -   SACRIFICES {2}   -   FINALS {3}"), P->MatchesPlayed, P->Crowns, P->Sacrifices, P->Finals) : FText::GetEmpty();
 			})
 		]
+
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			SNew(SBox).MaxDesiredHeight(460.f)

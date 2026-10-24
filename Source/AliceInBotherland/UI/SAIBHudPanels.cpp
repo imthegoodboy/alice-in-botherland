@@ -631,6 +631,11 @@ TSharedRef<SWidget> SAIBHud::MakeNumberPanel()
 						const AAIBPlayerState* Me = MyPS();
 						if (Phase() == EAIBPhase::Stage1RoundIntro) return LOCTEXT("GetReady", "GET READY - PICK A NUMBER FROM 0 TO 100");
 						if (Me && Me->bSubmitted) return LOCTEXT("Locked", "NUMBER LOCKED IN");
+						const AAIBGameState* G = GS();
+						if (G && Me && G->bStage1SuddenDeath)
+						{
+							return G->Stage1AtRisk.Contains(Me->Slot) ? LOCTEXT("PickAtRisk", "SUDDEN DEATH - YOU ARE AT RISK") : LOCTEXT("PickSafe", "YOU ARE SAFE - BUT YOUR NUMBER MOVES THE TARGET");
+						}
 						return LOCTEXT("PickNumber", "YOUR SECRET NUMBER");
 					})
 				]
@@ -700,7 +705,7 @@ TSharedRef<SWidget> SAIBHud::MakeNumberPanel()
 		.Text_Lambda([this]()
 		{
 			const AAIBPlayerState* Me = MyPS();
-			return Me && Me->IsActiveChampion() ? LOCTEXT("SafeRound", "YOU ARE SAFE THIS ROUND - WATCH THE SUDDEN DEATH") : LOCTEXT("Watching", "WATCHING THE NUMBER GAME");
+			return Me && Me->IsActiveChampion() ? LOCTEXT("SafeRound", "WATCH THE SUDDEN DEATH") : LOCTEXT("Watching", "WATCHING THE NUMBER GAME");
 		}),
 		FMargin(24.f, 14.f));
 
@@ -728,7 +733,7 @@ TSharedRef<SWidget> SAIBHud::MakeNumberResults()
 		{
 			const AAIBGameState* G = GS();
 			if (!G) return EVisibility::Collapsed;
-			const bool bShow = G->Phase == EAIBPhase::Stage1Results || G->Phase == EAIBPhase::Stage1Elimination || (G->Phase == EAIBPhase::Stage1Reveal && G->GetPhaseAlpha() > 0.7f);
+			const bool bShow = G->Phase == EAIBPhase::Stage1Results || (G->Phase == EAIBPhase::Stage1Elimination && G->Fallen.Num() == 0) || (G->Phase == EAIBPhase::Stage1Reveal && G->GetPhaseAlpha() > 0.7f);
 			return bShow ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 		})
 		.HAlign(HAlign_Right)

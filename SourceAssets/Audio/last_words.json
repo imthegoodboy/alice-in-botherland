@@ -1,0 +1,20 @@
+{
+  "voice": "Champion (ElevenLabs Callum N2lVS1w4EtoT3dr4eOWO): a weary survivor's last words before the Guardian's judgement",
+  "voice_id": "N2lVS1w4EtoT3dr4eOWO",
+  "settings": {
+    "stability": 0.32,
+    "similarity_boost": 0.8,
+    "style": 0.55,
+    "use_speaker_boost": true
+  },
+  "lines": {
+    "LW_01": "Today is not my day... but I hope my people survive.",
+    "LW_02": "Tell my people I tried. Tell them to keep sailing.",
+    "LW_03": "So this is where my road ends. Look after them for me.",
+    "LW_04": "I came so far... Please. Let my people find a home.",
+    "LW_05": "Don't mourn me. Just don't let them forget why we came.",
+    "LW_06": "I'm sorry. I wanted to bring them home.",
+    "LW_07": "Not like this... Forgive me, my people.",
+    "LW_08": "Keep the fires burning. One of us has to make it."
+  }
+}

@@ -98,6 +98,15 @@ namespace AIBIcon
 	constexpr TCHAR Explore = 0xe87a;
 	constexpr TCHAR Shield = 0xe9e0;
 	constexpr TCHAR Keyboard = 0xe312;
+	constexpr TCHAR VolumeOff = 0xe04f;
+	constexpr TCHAR Warning = 0xe002;
+	constexpr TCHAR Theater = 0xea66;
+	constexpr TCHAR Car = 0xe531;
+	constexpr TCHAR Timeline = 0xe922;
+	constexpr TCHAR Star = 0xe838;
+	constexpr TCHAR Flag = 0xe153;
+	constexpr TCHAR Target = 0xe1b3;
+	constexpr TCHAR Heart = 0xe87d;
 
 	inline FText Glyph(TCHAR Code) { return FText::FromString(FString::Chr(Code)); }
 }

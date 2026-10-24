@@ -123,7 +123,8 @@ UAudioComponent* UAIBAudioSubsystem::MakeComponent(USoundBase* Sound, float Volu
 void UAIBAudioSubsystem::PlayCue(FName CueId)
 {
 	const FString Id = CueId.ToString();
-	if (Id.StartsWith(TEXT("VO_")) || Id.StartsWith(TEXT("NAR_")))
+	// LW_: a champion's last words (the HUD shows them as a quote, so no caption).
+	if (Id.StartsWith(TEXT("VO_")) || Id.StartsWith(TEXT("NAR_")) || Id.StartsWith(TEXT("LW_")))
 	{
 		PlayVoice(CueId);
 	}

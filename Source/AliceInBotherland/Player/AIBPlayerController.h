@@ -44,7 +44,10 @@ public:
 	UFUNCTION(Server, Reliable) void ServerSendChat(const FString& Text, int32 ToSlot, EAIBSymbol Claim);
 	UFUNCTION(Server, Reliable) void ServerFinalSelect(EAIBFinalChoice Choice);
 	UFUNCTION(Server, Reliable) void ServerFinalConfirm(bool bConfirm);
-	UFUNCTION(Server, Reliable) void ServerSetSwitchInteract(bool bHolding);
+	/** Leaving from the menu: the seat is not held for a reconnect. */
+	UFUNCTION(Server, Reliable) void ServerLeaving();
+	/** The number on the dial (counts if the timer runs out before it is sent). */
+	UFUNCTION(Server, Reliable) void ServerSetDraftNumber(int32 Number);
 
 	// ---------------- Client RPCs ----------------
 	UFUNCTION(Client, Reliable) void ClientReceiveChat(const FAIBChatMessage& Message);
@@ -70,11 +73,19 @@ public:
 	int32 GetLoreFound() const;
 	/** Voice chat: microphone currently sending. */
 	bool IsSpeaking() const { return bSpeaking; }
+	/** Microphone on/off (M): off, or back to push-to-talk / open mic as it was. */
+	void ToggleMicMute();
+	void SetMicMode(int32 NewMode);
+	int32 GetMicMode() const { return MicMode; }
+	/** Voice and chat from this champion are hidden for me. */
+	bool IsMutedLocally(const AAIBPlayerState* PS) const;
+	void ToggleMuteLocally(const AAIBPlayerState* PS);
+	/** Server: set when the player left from the menu or was removed by the host. */
+	bool bLeftForGood = false;
 
 	/** Number currently dialled in on the selector (not yet sent). */
 	int32 DraftNumber = 50;
 	EAIBSymbol DraftGuess = EAIBSymbol::None;
-	bool bHoldingInteract = false;
 
 	/** Toasts shown on screen (text + local time). */
 	struct FToast { FText Text; float Time; };
@@ -100,6 +111,8 @@ protected:
 	/** Plays Alice's lines for the current phase in step with the phase clock. */
 	void UpdateNarration();
 	void UpdateVoiceChat();
+	/** Sends the dialled number now and then during the Number Game. */
+	void UpdateDraftNumber();
 	void UpdateLore();
 	void ApplySettings();
 	void ChooseSpectateTarget(int32 Direction);
@@ -121,6 +134,7 @@ protected:
 	void OnSpectateNext();
 	void OnSpectatePrev();
 	void OnTalk(const FInputActionValue& Value);
+	void OnMicToggle();
 
 	bool IsMovementAllowed() const;
 
@@ -140,6 +154,7 @@ protected:
 	UPROPERTY() TObjectPtr<UInputAction> IA_SpectateNext;
 	UPROPERTY() TObjectPtr<UInputAction> IA_SpectatePrev;
 	UPROPERTY() TObjectPtr<UInputAction> IA_Talk;
+	UPROPERTY() TObjectPtr<UInputAction> IA_MicToggle;
 
 	UPROPERTY() TObjectPtr<ACameraActor> CineCamera;
 
@@ -164,4 +179,13 @@ protected:
 	bool bSpeaking = false;
 	bool bLobbyWelcomed = false;
 	bool bVoiceRegistered = false;
+	int32 MicModeBeforeMute = 1;
+	float VoiceChatVolume = 1.f;
+	float NextVoipVolumeTime = 0.f;
+	/** Online ids of the champions I muted. */
+	TArray<FUniqueNetIdRepl> LocallyMuted;
+	int32 DraftBaseline = INDEX_NONE;
+	int32 DraftSent = INDEX_NONE;
+	float NextDraftSendTime = 0.f;
+	int32 DraftPhaseSerial = -1;
 };

@@ -16,6 +16,9 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "Animation/AnimInstance.h"
+#include "Components/PoseableMeshComponent.h"
+#include "GameFramework/GameStateBase.h"
+#include "Game/AIBGameState.h"
 
 AAIBCharacter::AAIBCharacter()
 {
@@ -106,6 +109,7 @@ void AAIBCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AAIBCharacter, bSprinting);
 	DOREPLIFETIME(AAIBCharacter, bHiddenForRace);
+	DOREPLIFETIME(AAIBCharacter, PoseState);
 }
 
 void AAIBCharacter::BeginPlay()
@@ -173,6 +177,7 @@ void AAIBCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float Time = GetWorld()->GetTimeSeconds();
+	UpdatePose(DeltaSeconds);
 
 	if (SymbolMesh->IsVisible())
 	{
@@ -182,7 +187,11 @@ void AAIBCharacter::Tick(float DeltaSeconds)
 	}
 
 	// Timed effects.
-	if (ActiveEffect != EEffect::None && EffectStartTime >= 0.f)
+	if (ActiveEffect == EEffect::Judged && EffectStartTime >= 0.f)
+	{
+		TickJudgement(Time - EffectStartTime);
+	}
+	else if (ActiveEffect != EEffect::None && EffectStartTime >= 0.f)
 	{
 		const float T = Time - EffectStartTime;
 		for (int32 Index = 0; Index < EffectComponents.Num(); ++Index)
@@ -296,14 +305,7 @@ void AAIBCharacter::ShowLocalSymbol(EAIBSymbol Symbol)
 void AAIBCharacter::MulticastEliminated_Implementation()
 {
 	ShowLocalSymbol(EAIBSymbol::None);
-	GetCharacterMovement()->DisableMovement();
-	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	USkeletalMeshComponent* MeshComp = GetMesh();
-	MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
-	MeshComp->SetAllBodiesSimulatePhysics(true);
-	MeshComp->SetSimulatePhysics(true);
-	MeshComp->WakeAllRigidBodies();
-	MeshComp->AddImpulse(FVector(0.f, 0.f, -2000.f) + GetActorForwardVector() * -3000.f, NAME_None, true);
+	Collapse(FVector(0.f, 0.f, -2000.f) + GetActorForwardVector() * -3000.f);
 
 	UPointLightComponent* Flash = NewObject<UPointLightComponent>(this);
 	Flash->SetupAttachment(RootComponent);
@@ -381,6 +383,15 @@ void AAIBCharacter::MulticastCrown_Implementation()
 
 void AAIBCharacter::MulticastRestore_Implementation()
 {
+	ClearPoseVisual();
+	if (HasAuthority())
+	{
+		StopPose();
+	}
+	JudgeBeam = nullptr;
+	JudgeCore = nullptr;
+	JudgeRing = nullptr;
+	JudgeLight = nullptr;
 	for (USceneComponent* Comp : EffectComponents)
 	{
 		if (Comp)
@@ -404,4 +415,230 @@ void AAIBCharacter::MulticastRestore_Implementation()
 	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	AppliedSlot = INDEX_NONE;
 	ApplyCommunityLook();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Story poses
+// ---------------------------------------------------------------------------------------------------------------------
+
+float AAIBCharacter::ServerNow() const
+{
+	const AGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState() : nullptr;
+	return GS ? GS->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
+}
+
+void AAIBCharacter::PlayPose(EAIBPose Pose)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	PoseState.Pose = static_cast<uint8>(Pose);
+	PoseState.StartTime = ServerNow();
+	PoseState.Serial++;
+	OnRep_Pose();
+	ForceNetUpdate();
+}
+
+void AAIBCharacter::StopPose()
+{
+	if (!HasAuthority() || PoseState.Pose == 0)
+	{
+		return;
+	}
+	PoseState.Pose = 0;
+	PoseState.Serial++;
+	OnRep_Pose();
+	ForceNetUpdate();
+}
+
+void AAIBCharacter::OnRep_Pose()
+{
+	// The pose shown keeps playing while it fades out after a stop; a new one takes over straight away.
+	if (PoseState.Pose != 0)
+	{
+		ShownPose = static_cast<EAIBPose>(PoseState.Pose);
+		ShownPoseStart = PoseState.StartTime;
+	}
+}
+
+void AAIBCharacter::ClearPoseVisual()
+{
+	PoseWeight = 0.f;
+	ShownPose = EAIBPose::None;
+	if (bPoseHidMesh)
+	{
+		GetMesh()->SetHiddenInGame(false);
+		bPoseHidMesh = false;
+	}
+	if (PoseMesh)
+	{
+		PoseMesh->SetHiddenInGame(true);
+	}
+}
+
+void AAIBCharacter::UpdatePose(float DeltaSeconds)
+{
+	const float Now = ServerNow();
+	const bool bCanShow = !bHiddenForRace && ActiveEffect != EEffect::Eliminated && !GetMesh()->IsSimulatingPhysics();
+	const bool bOn = bCanShow && GetPose() != EAIBPose::None;
+	PoseWeight = FMath::FInterpTo(PoseWeight, bOn ? 1.f : 0.f, DeltaSeconds, bOn ? 5.f : 6.f);
+	if (!bOn && PoseWeight < 0.02f)
+	{
+		if (bPoseHidMesh)
+		{
+			ClearPoseVisual();
+		}
+		return;
+	}
+	if (!bCanShow || ShownPose == EAIBPose::None)
+	{
+		ClearPoseVisual();
+		return;
+	}
+
+	USkeletalMeshComponent* Body = GetMesh();
+	if (!PoseMesh)
+	{
+		PoseMesh = NewObject<UPoseableMeshComponent>(this, TEXT("StoryPose"));
+		PoseMesh->SetupAttachment(Body);
+		PoseMesh->SetSkinnedAssetAndUpdate(Body->GetSkeletalMeshAsset());
+		PoseMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		PoseMesh->SetHiddenInGame(true);
+		PoseMesh->RegisterComponent();
+	}
+	if (!bPoseHidMesh)
+	{
+		// Same look as the animated body (community colours included).
+		for (int32 Index = 0; Index < Body->GetNumMaterials(); ++Index)
+		{
+			PoseMesh->SetMaterial(Index, Body->GetMaterial(Index));
+		}
+		Body->SetHiddenInGame(true);
+		PoseMesh->SetHiddenInGame(false);
+		bPoseHidMesh = true;
+	}
+	PoseMesh->CopyPoseFromSkeletalComponent(Body);
+	AIBPoses::Apply(PoseMesh, ShownPose, Now - ShownPoseStart, FMath::SmoothStep(0.f, 1.f, PoseWeight));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The Guardian's judgement
+// ---------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+	/** Height (cm above the champion) the beam comes down from. */
+	constexpr float JudgeTop = 7000.f;
+	/** Seconds of the thin charging beam before it strikes. */
+	constexpr float JudgeCharge = 0.6f;
+}
+
+void AAIBCharacter::MulticastJudgement_Implementation()
+{
+	ShowLocalSymbol(EAIBSymbol::None);
+	const FLinearColor Red(1.f, 0.05f, 0.03f);
+	auto Piece = [this](UStaticMesh* PieceMesh, UMaterialInterface* Material)
+	{
+		UStaticMeshComponent* Comp = NewObject<UStaticMeshComponent>(this);
+		Comp->SetupAttachment(RootComponent);
+		Comp->SetUsingAbsoluteRotation(true);
+		Comp->SetStaticMesh(PieceMesh);
+		Comp->SetMaterial(0, Material);
+		Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Comp->SetCastShadow(false);
+		Comp->SetRelativeScale3D(FVector(0.01f));
+		Comp->RegisterComponent();
+		EffectComponents.Add(Comp);
+		return Comp;
+	};
+	JudgeBeam = Piece(AIBAssets::Mesh(AIBAssets::Paths::VFX + TEXT("SM_BeamCylinder"), AIBAssets::Cylinder()), AIBAssets::MakeBeam(this, Red, 22.f));
+	JudgeCore = Piece(AIBAssets::Cylinder(), AIBAssets::MakeEmissive(this, FLinearColor(1.f, 0.18f, 0.1f), 45.f));
+	JudgeRing = Piece(AIBAssets::Sphere(), AIBAssets::MakeEmissive(this, Red, 40.f));
+
+	JudgeLight = NewObject<UPointLightComponent>(this);
+	JudgeLight->SetupAttachment(RootComponent);
+	JudgeLight->SetIntensityUnits(ELightUnits::Candelas);
+	JudgeLight->SetLightColor(Red);
+	JudgeLight->SetAttenuationRadius(2600.f);
+	JudgeLight->SetIntensity(0.f);
+	JudgeLight->SetRelativeLocation(FVector(0.f, 0.f, 160.f));
+	JudgeLight->RegisterComponent();
+	EffectComponents.Add(JudgeLight);
+
+	bJudgeCollapsed = false;
+	ActiveEffect = EEffect::Judged;
+	EffectStartTime = GetWorld()->GetTimeSeconds();
+	TickJudgement(0.f);
+}
+
+void AAIBCharacter::TickJudgement(float T)
+{
+	// A thin flickering line finds the champion, then the full beam slams down, the ground flashes, and it fades.
+	const float Flicker = 0.75f + 0.25f * FMath::Sin(T * 70.f);
+	const float Blast = FMath::Clamp((T - JudgeCharge) / 0.12f, 0.f, 1.f);
+	const float Fade = 1.f - FMath::Clamp((T - JudgeCharge - 0.35f) / 1.6f, 0.f, 1.f);
+	const float Width = T < JudgeCharge ? 0.06f * Flicker : FMath::Lerp(0.06f, 1.7f, Blast) * FMath::Lerp(0.35f, 1.f, Fade) * Fade;
+	const float Bottom = -94.f;
+	// The charging line comes down from the sky before it touches the ground.
+	const float Reach = FMath::Clamp(T / (JudgeCharge * 0.7f), 0.f, 1.f);
+	const float Top = JudgeTop;
+	const float Low = FMath::Lerp(Top, Bottom, Reach);
+	const float Length = FMath::Max(1.f, Top - Low);
+	const FVector Mid(0.f, 0.f, (Top + Low) * 0.5f);
+	if (JudgeBeam)
+	{
+		JudgeBeam->SetRelativeLocation(Mid);
+		JudgeBeam->SetRelativeScale3D(FVector(FMath::Max(0.001f, Width), FMath::Max(0.001f, Width), Length / 100.f));
+		JudgeBeam->SetVisibility(Width > 0.002f);
+	}
+	if (JudgeCore)
+	{
+		const float CoreWidth = Width * 0.22f;
+		JudgeCore->SetRelativeLocation(Mid);
+		JudgeCore->SetRelativeScale3D(FVector(FMath::Max(0.001f, CoreWidth), FMath::Max(0.001f, CoreWidth), Length / 100.f));
+		JudgeCore->SetVisibility(CoreWidth > 0.002f);
+	}
+	if (JudgeRing)
+	{
+		const float Spread = FMath::Clamp((T - JudgeCharge) / 0.7f, 0.f, 1.f);
+		const float RingFade = 1.f - FMath::Clamp((T - JudgeCharge - 0.3f) / 0.9f, 0.f, 1.f);
+		const float Size = FMath::Lerp(0.2f, 6.f, FMath::Sqrt(Spread)) * RingFade;
+		JudgeRing->SetRelativeLocation(FVector(0.f, 0.f, Bottom + 2.f));
+		JudgeRing->SetRelativeScale3D(FVector(FMath::Max(0.001f, Size), FMath::Max(0.001f, Size), 0.03f));
+		JudgeRing->SetVisibility(T >= JudgeCharge && Size > 0.01f);
+	}
+	if (JudgeLight)
+	{
+		const float Charge = FMath::Clamp(T / JudgeCharge, 0.f, 1.f) * Flicker;
+		const float Intensity = T < JudgeCharge ? 2500.f * Charge : 26000.f * FMath::Max(0.f, 1.f - (T - JudgeCharge) / 2.2f);
+		JudgeLight->SetIntensity(Intensity * AIB::LightScale);
+	}
+	if (!bJudgeCollapsed && T >= JudgeCharge + 0.05f)
+	{
+		// Struck: the champion drops where they stand.
+		bJudgeCollapsed = true;
+		Collapse(FVector(0.f, 0.f, -4500.f) + GetActorForwardVector() * -1200.f);
+	}
+	if (T > 8.f)
+	{
+		GetMesh()->SetVisibility(false, true);
+	}
+}
+
+void AAIBCharacter::Collapse(const FVector& Impulse)
+{
+	ClearPoseVisual();
+	if (HasAuthority())
+	{
+		StopPose();
+	}
+	GetCharacterMovement()->DisableMovement();
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
+	MeshComp->SetAllBodiesSimulatePhysics(true);
+	MeshComp->SetSimulatePhysics(true);
+	MeshComp->WakeAllRigidBodies();
+	MeshComp->AddImpulse(Impulse, NAME_None, true);
 }

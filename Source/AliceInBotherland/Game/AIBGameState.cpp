@@ -34,6 +34,7 @@ void AAIBGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AAIBGameState, BannerColor);
 	DOREPLIFETIME(AAIBGameState, Stage1Round);
 	DOREPLIFETIME(AAIBGameState, bStage1SuddenDeath);
+	DOREPLIFETIME(AAIBGameState, Stage1AtRisk);
 	DOREPLIFETIME(AAIBGameState, Stage1Participants);
 	DOREPLIFETIME(AAIBGameState, Stage1Last);
 	DOREPLIFETIME(AAIBGameState, Stage2Round);
@@ -41,6 +42,11 @@ void AAIBGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AAIBGameState, Stage2Participants);
 	DOREPLIFETIME(AAIBGameState, Stage2Last);
 	DOREPLIFETIME(AAIBGameState, Finalists);
+	DOREPLIFETIME(AAIBGameState, Stage2Ledger);
+	DOREPLIFETIME(AAIBGameState, MatchStartTime);
+	DOREPLIFETIME(AAIBGameState, Timeline);
+	DOREPLIFETIME(AAIBGameState, Fallen);
+	DOREPLIFETIME(AAIBGameState, FallStrikeAt);
 	DOREPLIFETIME(AAIBGameState, bRaceSuddenDeath);
 	DOREPLIFETIME(AAIBGameState, SwitchProgress);
 	DOREPLIFETIME(AAIBGameState, RaceDistance);
