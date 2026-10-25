@@ -8,6 +8,9 @@ and at the end of it all a single choice remains: **become the King, or save you
 
 ![The story](docs/screenshots/story.png)
 
+# story / Dialogue  writeen by @sarthak567
+
+
 | | |
 |---|---|
 | ![Main menu](docs/screenshots/main-menu.png) | ![The room](docs/screenshots/lobby.png) |
